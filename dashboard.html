@@ -231,22 +231,20 @@ function fmt(n) {
 function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 async function tryFetch(urls) {
-  // urls can be a single URL string or an array
   const targets = Array.isArray(urls) ? urls : [urls];
+  const headers = { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' };
 
   for (const url of targets) {
-    // 1. Try direct first
+    // 1. Direct request
     try {
-      const r = await fetch(url, { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' } });
+      const r = await fetch(url, { headers });
       if (r.ok) return r.json();
     } catch {}
 
-    // 2. Try each proxy in order
+    // 2. Try each proxy — append raw URL (no encoding, proxies expect plain URL)
     for (const proxy of PROXIES) {
       try {
-        const r = await fetch(proxy + encodeURIComponent(url), {
-          headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' }
-        });
+        const r = await fetch(proxy + url, { headers });
         if (r.ok) return r.json();
       } catch {}
     }
@@ -446,10 +444,17 @@ async function loadPopularGames() {
     .sort((a, b) => b.activePlayers - a.activePlayers)
     .slice(0, TOP_N);
 
-  // 3. Resolve universe IDs for all (parallel)
-  const universeIds = await Promise.all(
-    sorted.map(g => getUniverseId(g.placeId))
-  );
+  // 3. Resolve universe IDs — throttle to 5 at a time to avoid flooding proxy
+  async function resolveInBatches(games, batchSize) {
+    const results = [];
+    for (let i = 0; i < games.length; i += batchSize) {
+      const batch = games.slice(i, i + batchSize);
+      const ids = await Promise.all(batch.map(g => getUniverseId(g.placeId)));
+      results.push(...ids);
+    }
+    return results;
+  }
+  const universeIds = await resolveInBatches(sorted, 5);
   sorted.forEach((g, i) => { g.universeId = universeIds[i]; });
 
   // 4. Fetch full game info + votes in batches of 10 (API limit)
