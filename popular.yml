@@ -1,0 +1,128 @@
+name: Update Popular Games
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes
+  workflow_dispatch:           # allow manual trigger from GitHub UI
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Fetch & build popular.json
+        run: |
+          python3 - << 'PYEOF'
+          import json, urllib.request, urllib.error, time, os
+
+          HEADERS = {
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (compatible; GhostDashboard/1.0)',
+          }
+          TOP_N = 25
+
+          def get(url, timeout=15):
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+              return json.loads(r.read().decode())
+
+          # 1. Fetch Rolimons game list
+          print("Fetching Rolimons...")
+          roli = get('https://api.rolimons.com/games/v1/gamelist')
+          games_raw = roli.get('games', {})
+
+          # Sort by active players descending, take top N
+          sorted_games = sorted(
+            [{'placeId': pid, 'name': v[0], 'activePlayers': v[1] or 0, 'icon': v[2]}
+             for pid, v in games_raw.items()],
+            key=lambda g: g['activePlayers'], reverse=True
+          )[:TOP_N]
+
+          print(f"Got {len(sorted_games)} games from Rolimons")
+
+          # 2. Resolve universe IDs
+          def get_universe(place_id):
+            try:
+              j = get(f'https://apis.roblox.com/universes/v1/places/{place_id}/universe')
+              return j.get('universeId')
+            except:
+              return None
+
+          for g in sorted_games:
+            g['universeId'] = get_universe(g['placeId'])
+            time.sleep(0.05)   # be polite
+
+          valid = [g for g in sorted_games if g['universeId']]
+          print(f"{len(valid)} games resolved to universe IDs")
+
+          # 3. Batch-fetch game info (10 per request)
+          def chunks(lst, n):
+            for i in range(0, len(lst), n):
+              yield lst[i:i+n]
+
+          info_map = {}
+          for batch in chunks(valid, 10):
+            uids = ','.join(str(g['universeId']) for g in batch)
+            try:
+              j = get(f'https://games.roblox.com/v1/games?universeIds={uids}&lang=en')
+              for d in j.get('data', []):
+                info_map[d['id']] = d
+            except Exception as e:
+              print(f"  Info batch error: {e}")
+            time.sleep(0.1)
+
+          # 4. Fetch votes individually
+          votes_map = {}
+          for g in valid:
+            try:
+              j = get(f'https://games.roblox.com/v1/games/{g["universeId"]}/votes')
+              votes_map[g['universeId']] = j
+            except:
+              pass
+            time.sleep(0.05)
+
+          # 5. Build output
+          output = []
+          for rank, g in enumerate(sorted_games, 1):
+            uid   = g.get('universeId')
+            info  = info_map.get(uid, {}) if uid else {}
+            votes = votes_map.get(uid, {}) if uid else {}
+            likes    = votes.get('upVotes')
+            dislikes = votes.get('downVotes')
+            total    = (likes or 0) + (dislikes or 0)
+            pct      = round(likes / total * 100) if total > 0 and likes is not None else None
+            output.append({
+              'rank':         rank,
+              'placeId':      g['placeId'],
+              'universeId':   uid,
+              'name':         info.get('name') or g['name'] or 'Unknown',
+              'creator':      info.get('creator', {}).get('name', ''),
+              'icon':         g['icon'],
+              'visits':       info.get('visits'),
+              'playing':      info.get('playing') or g['activePlayers'],
+              'likes':        likes,
+              'dislikes':     dislikes,
+              'likeRatio':    pct,
+              'updated':      info.get('updated'),
+            })
+
+          with open('popular.json', 'w') as f:
+            json.dump({'generatedAt': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'games': output}, f)
+
+          print(f"Wrote popular.json with {len(output)} games")
+          PYEOF
+
+      - name: Commit popular.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add popular.json
+          git diff --staged --quiet || git commit -m "chore: update popular games [skip ci]"
+          git push
