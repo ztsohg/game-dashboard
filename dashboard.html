@@ -157,7 +157,12 @@
 /* ═══════════════════════════════════════════════════════════
    Constants & defaults
 ═══════════════════════════════════════════════════════════ */
-const PROXY         = 'https://corsproxy.io/?';
+const PROXIES = [
+  'https://corsproxy.io/?',
+  'https://api.allorigins.win/raw?url=',
+  'https://corsproxy.org/?',
+  'https://proxy.cors.sh/',
+];
 const REFRESH       = 30_000;
 const POPULAR_REFRESH = 3 * 60_000; // 3 min — rolimons updates periodically
 const LS_KEY        = 'ghost_dashboard_settings';
@@ -226,17 +231,31 @@ function fmt(n) {
 function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 async function tryFetch(urls) {
-  for (const url of urls) {
+  // urls can be a single URL string or an array
+  const targets = Array.isArray(urls) ? urls : [urls];
+
+  for (const url of targets) {
+    // 1. Try direct first
     try {
       const r = await fetch(url, { headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' } });
       if (r.ok) return r.json();
     } catch {}
+
+    // 2. Try each proxy in order
+    for (const proxy of PROXIES) {
+      try {
+        const r = await fetch(proxy + encodeURIComponent(url), {
+          headers: { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' }
+        });
+        if (r.ok) return r.json();
+      } catch {}
+    }
   }
   return null;
 }
 async function getUniverseId(placeId) {
   const base = `https://apis.roblox.com/universes/v1/places/${placeId}/universe`;
-  const j = await tryFetch([base, PROXY + base]);
+  const j = await tryFetch(base);
   return j?.universeId ?? null;
 }
 
@@ -331,8 +350,8 @@ async function fetchGame(game, i) {
   const infoBase  = `https://games.roblox.com/v1/games?universeIds=${game.universeId}&lang=en`;
   const votesBase = `https://games.roblox.com/v1/games/${game.universeId}/votes`;
   const [infoJson, votesJson] = await Promise.all([
-    tryFetch([infoBase, PROXY+infoBase]),
-    tryFetch([votesBase,PROXY+votesBase])
+    tryFetch(infoBase),
+    tryFetch(votesBase)
   ]);
   const d = infoJson?.data?.[0];
   if (!d) { setEl(`name-${i}`, 'Could not load'); document.getElementById('corsNote').classList.add('show'); return; }
@@ -360,7 +379,7 @@ async function fetchGame(game, i) {
 
 async function fetchIcon(game, i) {
   const base = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${game.universeId}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`;
-  const j = await tryFetch([base, PROXY+base]);
+  const j = await tryFetch(base);
   const url = j?.data?.[0]?.imageUrl;
   if (!url) return;
   const wrap = document.getElementById(`icon-${i}`);
@@ -410,20 +429,8 @@ async function loadPopularGames() {
   setEl('popularMeta', 'Loading…');
   showPopularSkeletons();
 
-  // 1. Fetch rolimons game list (includes placeId, name, activePlayers, icon)
-  let roliData = null;
-  try {
-    const r = await fetch(ROLIMONS, { headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
-    if (r.ok) roliData = await r.json();
-  } catch {}
-
-  // Also try via proxy if direct fails
-  if (!roliData) {
-    try {
-      const r = await fetch(PROXY + ROLIMONS, { headers: { 'Accept-Language': 'en-US,en;q=0.9' } });
-      if (r.ok) roliData = await r.json();
-    } catch {}
-  }
+  // 1. Fetch rolimons game list — tryFetch handles direct + all proxies
+  const roliData = await tryFetch(ROLIMONS);
 
   if (!roliData?.games) {
     document.getElementById('popularList').innerHTML =
@@ -455,13 +462,13 @@ async function loadPopularGames() {
   await Promise.all(batches.map(async batch => {
     const uids = batch.map(g => g.universeId).join(',');
     const infoBase = `https://games.roblox.com/v1/games?universeIds=${uids}&lang=en`;
-    const infoJson = await tryFetch([infoBase, PROXY+infoBase]);
+    const infoJson = await tryFetch(infoBase);
     (infoJson?.data ?? []).forEach(d => { infoMap[d.id] = d; });
 
     // Votes must be fetched individually
     await Promise.all(batch.map(async g => {
       const base = `https://games.roblox.com/v1/games/${g.universeId}/votes`;
-      const j = await tryFetch([base, PROXY+base]);
+      const j = await tryFetch(base);
       if (j) votesMap[g.universeId] = j;
     }));
   }));
@@ -551,9 +558,9 @@ async function runSearch() {
   const uid = await getUniverseId(raw);
   if (!uid) { searchResult.innerHTML=`<div class="search-error">⚠ Could not find a game with Place ID <strong>${raw}</strong>.</div>`; return; }
   const [infoJson,votesJson,iconJson] = await Promise.all([
-    tryFetch([`https://games.roblox.com/v1/games?universeIds=${uid}&lang=en`, PROXY+`https://games.roblox.com/v1/games?universeIds=${uid}&lang=en`]),
-    tryFetch([`https://games.roblox.com/v1/games/${uid}/votes`, PROXY+`https://games.roblox.com/v1/games/${uid}/votes`]),
-    tryFetch([`https://thumbnails.roblox.com/v1/games/icons?universeIds=${uid}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`, PROXY+`https://thumbnails.roblox.com/v1/games/icons?universeIds=${uid}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`])
+    tryFetch(`https://games.roblox.com/v1/games?universeIds=${uid}&lang=en`),
+    tryFetch(`https://games.roblox.com/v1/games/${uid}/votes`),
+    tryFetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${uid}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`)
   ]);
   const d = infoJson?.data?.[0];
   if (!d) { searchResult.innerHTML=`<div class="search-error">⚠ Could not load data. Try again.</div>`; return; }
