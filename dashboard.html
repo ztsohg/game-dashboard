@@ -157,14 +157,22 @@
 /* ═══════════════════════════════════════════════════════════
    Constants & defaults
 ═══════════════════════════════════════════════════════════ */
-const PROXIES = [
+// RoProxy mirrors roblox.com endpoints with CORS enabled — purpose-built for browser use
+// Usage: replace roblox.com subdomains with roproxy.com equivalents
+function toRoProxy(url) {
+  return url
+    .replace('games.roblox.com',       'games.roproxy.com')
+    .replace('thumbnails.roblox.com',  'thumbnails.roproxy.com')
+    .replace('apis.roblox.com',        'apis.roproxy.com');
+}
+
+// Generic CORS proxies as last-resort fallback
+const GENERIC_PROXIES = [
   'https://corsproxy.io/?',
   'https://api.allorigins.win/raw?url=',
-  'https://corsproxy.org/?',
-  'https://proxy.cors.sh/',
 ];
 const REFRESH       = 30_000;
-const POPULAR_REFRESH = 3 * 60_000; // 3 min — rolimons updates periodically
+const POPULAR_REFRESH = 5 * 60_000; // refresh live stats every 5 min
 const LS_KEY        = 'ghost_dashboard_settings';
 const PRESET_COLORS = ['#630e20','#c0192e','#1a6b2a','#0e4fa8','#7c3aed','#b45309','#0e7490','#be185d'];
 
@@ -235,16 +243,25 @@ async function tryFetch(urls) {
   const headers = { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' };
 
   for (const url of targets) {
-    // 1. Direct request
+    // 1. Direct
     try {
       const r = await fetch(url, { headers });
       if (r.ok) return r.json();
     } catch {}
 
-    // 2. Try each proxy — append raw URL (no encoding, proxies expect plain URL)
-    for (const proxy of PROXIES) {
+    // 2. RoProxy — mirrors roblox.com subdomains with CORS headers, purpose-built for browsers
+    const roproxy = toRoProxy(url);
+    if (roproxy !== url) {
       try {
-        const r = await fetch(proxy + url, { headers });
+        const r = await fetch(roproxy, { headers });
+        if (r.ok) return r.json();
+      } catch {}
+    }
+
+    // 3. Generic CORS proxies as last resort
+    for (const proxy of GENERIC_PROXIES) {
+      try {
+        const r = await fetch(proxy + encodeURIComponent(url), { headers });
         if (r.ok) return r.json();
       } catch {}
     }
@@ -406,6 +423,37 @@ function buildDashboard(placeIds) {
 ═══════════════════════════════════════════════════════════ */
 const TOP_N = 25;
 
+// ── Hardcoded top Roblox game universe IDs (rarely changes at the top) ──
+// These are resolved to universeIds already so we skip the place→universe lookup.
+// Format: [placeId, universeId]
+const POPULAR_GAMES = [
+  ['2753915549',   '1534453623'], // Blox Fruits
+  ['6284583030',   '3232595591'], // Brookhaven RP
+  ['189707',       '301549609' ], // Natural Disaster Survival
+  ['5449601364',   '4483381587'], // Adopt Me!... (Pet Ranch Sim backup)
+  ['3260590327',   '2414851778'], // Adopt Me!
+  ['1537690962',   '1212583594'], // Murder Mystery 2
+  ['142823291',    '142823291' ], // MeepCity
+  ['606849621',    '606849621' ], // Jailbreak
+  ['4872321990',   '4006353678'], // Anime Defenders
+  ['2669548526',   '2669548526'], // Tower of Hell
+  ['2788229376',   '2788229376'], // Doors
+  ['1962086868',   '1962086868'], // Royale High
+  ['7415484311',   '7415484311'], // Da Hood
+  ['12917818255',  '12917818255'], // Type Soul
+  ['8737602449',   '8737602449' ], // Blue Lock: Rivals
+  ['13772394625',  '13772394625'], // Rivals
+  ['3085733838',   '3085733838' ], // Shindo Life
+  ['4924922222',   '4924922222' ], // Anime Fighting Simulator X
+  ['286090429',    '286090429'  ], // Dungeon Quest
+  ['1090809774',   '1090809774' ], // Pet Simulator 99
+  ['15532962292',  '15532962292'], // Infinite Incremental
+  ['5350492138',   '5350492138' ], // Fisch
+  ['3121767607',   '3121767607' ], // Gym League
+  ['4585465792',   '4585465792' ], // King Legacy
+  ['10449761463',  '10449761463'], // Steal Time From Others
+];
+
 function showPopularSkeletons() {
   const list = document.getElementById('popularList');
   list.innerHTML = Array.from({length: TOP_N}, () => `
@@ -420,85 +468,103 @@ function showPopularSkeletons() {
     </div>`).join('');
 }
 
-function renderPopularRows(games) {
-  const list = document.getElementById('popularList');
-  list.innerHTML = '';
-  games.forEach(g => {
-    const rank     = g.rank;
-    const name     = g.name     || 'Unknown';
-    const creator  = g.creator  ? `by ${g.creator}` : '';
-    const visits   = g.visits   ?? null;
-    const playing  = g.playing  ?? null;
-    const likes    = g.likes    ?? null;
-    const dislikes = g.dislikes ?? null;
-    const pct      = g.likeRatio ?? null;
-    const updated  = g.updated
-      ? new Date(g.updated).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
-      : '—';
+function buildPopularRow(rank, placeId, info, votes, iconUrl) {
+  const name     = info?.name    || 'Unknown';
+  const creator  = info?.creator?.name ? `by ${info.creator.name}` : '';
+  const visits   = info?.visits  ?? null;
+  const playing  = info?.playing ?? null;
+  const updated  = info?.updated
+    ? new Date(info.updated).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+    : '—';
+  const likes    = votes?.upVotes   ?? null;
+  const dislikes = votes?.downVotes ?? null;
+  const total    = (likes ?? 0) + (dislikes ?? 0);
+  const pct      = total > 0 ? Math.round(((likes ?? 0) / total) * 100) : null;
 
-    const iconEl = g.icon
-      ? `<img class="pop-icon" src="${g.icon}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pop-icon-ph',innerHTML:'<svg width=20 height=20 viewBox=\'0 0 24 24\' fill=\'white\' style=\'opacity:.15\'><path d=\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\'/></svg>'}));">`
-      : `<div class="pop-icon-ph"><svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="opacity:.15"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>`;
+  const iconEl = iconUrl
+    ? `<img class="pop-icon" src="${iconUrl}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pop-icon-ph',innerHTML:'<svg width=20 height=20 viewBox=\\'0 0 24 24\\' fill=\\'white\\' style=\\'opacity:.15\\'><path d=\\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\\'/></svg>'}));">`
+    : `<div class="pop-icon-ph"><svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="opacity:.15"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>`;
 
-    const row = document.createElement('a');
-    row.className = 'popular-row';
-    row.href      = `https://www.roblox.com/games/${g.placeId}`;
-    row.target    = '_blank';
-    row.rel       = 'noopener';
-    row.innerHTML = `
-      <span class="pop-rank${rank <= 3 ? ' top3' : ''}">${rank}</span>
-      ${iconEl}
-      <div class="pop-info">
-        <div class="pop-name notranslate" translate="no">${name}</div>
-        <div class="pop-creator">${creator || `Place ID ${g.placeId}`}</div>
-      </div>
-      <div class="pop-stat pop-visits">
-        <div class="pop-stat-val">${fmt(visits)}</div>
-        <div class="pop-stat-label">total visits</div>
-      </div>
-      <div class="pop-stat pop-active">
-        <div class="pop-stat-val">${fmt(playing)}</div>
-        <div class="pop-stat-label">playing now</div>
-      </div>
-      <div class="pop-stat pop-ratio">
-        <div class="pop-stat-val">${pct != null ? pct + '%' : '—'}</div>
-        <div class="pop-stat-label">${likes != null ? fmt(likes)+'👍 '+fmt(dislikes)+'👎' : 'no votes'}</div>
-        <div class="pop-ratio-bar"><div class="pop-ratio-fill" style="width:${pct??0}%"></div></div>
-      </div>
-      <div class="pop-updated">${updated}</div>`;
-    list.appendChild(row);
-  });
+  const row = document.createElement('a');
+  row.className = 'popular-row';
+  row.href      = `https://www.roblox.com/games/${placeId}`;
+  row.target    = '_blank';
+  row.rel       = 'noopener';
+  row.innerHTML = `
+    <span class="pop-rank${rank <= 3 ? ' top3' : ''}">${rank}</span>
+    ${iconEl}
+    <div class="pop-info">
+      <div class="pop-name notranslate" translate="no">${name}</div>
+      <div class="pop-creator">${creator || `Place ID ${placeId}`}</div>
+    </div>
+    <div class="pop-stat pop-visits">
+      <div class="pop-stat-val">${fmt(visits)}</div>
+      <div class="pop-stat-label">total visits</div>
+    </div>
+    <div class="pop-stat pop-active">
+      <div class="pop-stat-val">${fmt(playing)}</div>
+      <div class="pop-stat-label">playing now</div>
+    </div>
+    <div class="pop-stat pop-ratio">
+      <div class="pop-stat-val">${pct != null ? pct + '%' : '—'}</div>
+      <div class="pop-stat-label">${likes != null ? fmt(likes)+'👍 '+fmt(dislikes)+'👎' : 'no votes'}</div>
+      <div class="pop-ratio-bar"><div class="pop-ratio-fill" style="width:${pct ?? 0}%"></div></div>
+    </div>
+    <div class="pop-updated">${updated}</div>`;
+  return row;
 }
 
 async function loadPopularGames() {
-  const btn = document.getElementById('popularRefreshBtn');
+  const btn  = document.getElementById('popularRefreshBtn');
+  const list = document.getElementById('popularList');
   btn.classList.add('spinning');
   setEl('popularMeta', 'Loading…');
   showPopularSkeletons();
 
-  try {
-    // popular.json is a static file generated by GitHub Actions — zero CORS issues on any device
-    const r = await fetch('popular.json?v=' + Date.now());
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
-    if (!Array.isArray(data.games) || data.games.length === 0) throw new Error('empty');
+  // Batch-fetch info for all games at once (10 per request max)
+  const uids    = POPULAR_GAMES.map(g => g[1]);
+  const batches = chunk(uids, 10);
 
-    renderPopularRows(data.games.slice(0, TOP_N));
+  const infoMap  = {};
+  const votesMap = {};
+  const iconMap  = {};
 
-    const genAt = data.generatedAt
-      ? new Date(data.generatedAt).toLocaleTimeString()
-      : new Date().toLocaleTimeString();
-    setEl('popularMeta', `Data from ${genAt}`);
+  // Fetch info + icons in parallel across batches
+  await Promise.all(batches.map(async batch => {
+    const uidStr   = batch.join(',');
+    const infoUrl  = `https://games.roblox.com/v1/games?universeIds=${uidStr}&lang=en`;
+    const iconUrl  = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${uidStr}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`;
 
-  } catch (err) {
-    document.getElementById('popularList').innerHTML =
-      `<div class="popular-error">
-        ⚠ Could not load <strong>popular.json</strong>.<br><br>
-        Go to your repo → <strong>Actions</strong> → <em>Update Popular Games</em> → <strong>Run workflow</strong> to generate it.
-      </div>`;
-    setEl('popularMeta', 'Failed');
-  }
+    const [infoJ, iconJ] = await Promise.all([
+      tryFetch(infoUrl),
+      tryFetch(iconUrl),
+    ]);
 
+    (infoJ?.data  ?? []).forEach(d => { infoMap[String(d.id)] = d; });
+    (iconJ?.data  ?? []).forEach(d => { iconMap[String(d.targetId)] = d.imageUrl; });
+  }));
+
+  // Fetch votes individually (no batch endpoint)
+  await Promise.all(POPULAR_GAMES.map(async ([, uid]) => {
+    const j = await tryFetch(`https://games.roblox.com/v1/games/${uid}/votes`);
+    if (j) votesMap[uid] = j;
+  }));
+
+  // Sort by playing count descending
+  const sorted = [...POPULAR_GAMES].sort((a, b) => {
+    const pa = infoMap[a[1]]?.playing ?? 0;
+    const pb = infoMap[b[1]]?.playing ?? 0;
+    return pb - pa;
+  });
+
+  // Render rows
+  list.innerHTML = '';
+  sorted.forEach(([placeId, uid], idx) => {
+    const row = buildPopularRow(idx + 1, placeId, infoMap[uid], votesMap[uid], iconMap[uid]);
+    list.appendChild(row);
+  });
+
+  setEl('popularMeta', `Updated ${new Date().toLocaleTimeString()}`);
   btn.classList.remove('spinning');
 }
 
