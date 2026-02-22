@@ -6,7 +6,6 @@
   <meta name="google" content="notranslate">
   <title>Ghost's Dashboard</title>
   <link rel="stylesheet" href="dashboard.css">
-  <script src="ids.js"></script>
 </head>
 <body>
 
@@ -166,9 +165,7 @@ const PRESET_COLORS = ['#630e20','#c0192e','#1a6b2a','#0e4fa8','#7c3aed','#b4530
 
 const DEFAULT_SETTINGS = {
   accentBase:  '#630e20',
-  pinnedGames: (window.__GAME_IDS || []).slice(0, 3).map(g =>
-    typeof g === 'string' ? g : String(g.placeId)
-  ),
+  pinnedGames: ['', '', ''], // filled from ids.json at boot
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -639,18 +636,44 @@ document.addEventListener('keydown', e=>{
 /* ═══════════════════════════════════════════════════════════
    Boot
 ═══════════════════════════════════════════════════════════ */
-function init() {
+async function init() {
   applyAccent(settings.accentBase);
   let ids = settings.pinnedGames;
-  if (!ids || ids.every(x=>!x)) {
-    const raw=window.__GAME_IDS;
-    if (!Array.isArray(raw)||raw.length===0) {
-      document.getElementById('panels').innerHTML=`<div class="panel-error">⚠ <strong>ids.js</strong> is missing or empty.<br>Make sure ids.js is in the same folder.</div>`;
+
+  // If no saved games yet, load from ids.json
+  if (!ids || ids.every(x => !x)) {
+    try {
+      const r = await fetch('ids.json');
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const raw = await r.json();
+      if (!Array.isArray(raw) || raw.length === 0) throw new Error('empty');
+      ids = raw.slice(0, 3).map((g, i) =>
+        typeof g === 'string' ? g : String(g.placeId)
+      );
+      // Also update DEFAULT_SETTINGS so Reset uses these
+      DEFAULT_SETTINGS.pinnedGames = [...ids];
+      settings.pinnedGames = ids;
+    } catch (err) {
+      document.getElementById('panels').innerHTML =
+        `<div class="panel-error">⚠ Could not load <strong>ids.json</strong>.<br>
+         Make sure it exists in the same folder as this HTML file.</div>`;
       return;
     }
-    ids=raw.slice(0,3).map(g=>typeof g==='string'?g:String(g.placeId));
-    settings.pinnedGames=ids;
+  } else {
+    // Still try to load ids.json in background to update defaults
+    try {
+      const r = await fetch('ids.json');
+      if (r.ok) {
+        const raw = await r.json();
+        if (Array.isArray(raw) && raw.length > 0) {
+          DEFAULT_SETTINGS.pinnedGames = raw.slice(0, 3).map(g =>
+            typeof g === 'string' ? g : String(g.placeId)
+          );
+        }
+      }
+    } catch {}
   }
+
   buildDashboard(ids);
 
   // Load popular games and set up auto-refresh
