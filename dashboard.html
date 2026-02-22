@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Ghost's Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="ids.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+  <header>
+    <div class="logo-hex"></div>
+    <div class="header-copy">
+      <h1>GHOST'S <em>DASHBOARD</em></h1>
+      <small>Roblox Live Stats Tracker</small>
+    </div>
+    <div class="live-pill">
+      <span class="dot-blink"></span>
+      Live
+    </div>
+  </header>
+
+  <div class="tab-row">
+    <div class="tabs" id="tabs"></div>
+    <button class="icon-btn" id="searchBtn" title="Search game by ID" aria-label="Search game">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </div>
+
+  <div id="panels"></div>
+
+  <div class="cors-note" id="corsNote">
+    <strong>⚠ CORS Restriction Detected</strong><br>
+    Browsers block direct calls to the Roblox API when opening HTML files locally.
+    Use one of these options:<br><br>
+    Chrome: <code>chrome --disable-web-security --user-data-dir=/tmp/rbx-test</code><br>
+    Firefox: install the <strong>CORS Everywhere</strong> extension.<br>
+    Or: <code>npx serve .</code>
+  </div>
+
+</div>
+
+<!-- ─── Search Modal ─────────────────────────────────────── -->
+<div class="overlay" id="searchOverlay">
+  <div class="modal">
+    <div class="search-modal-header">
+      <div class="search-modal-title">Search by Place ID</div>
+      <div class="search-input-wrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="22" y2="22"/>
+        </svg>
+        <input class="search-input" id="searchInput" type="text" inputmode="numeric"
+          placeholder="Enter Place ID e.g. 2753915549" autocomplete="off" spellcheck="false">
+        <button class="search-go-btn" id="searchGoBtn">Search</button>
+      </div>
+    </div>
+    <div class="search-result hidden" id="searchResult"></div>
+    <div class="modal-close-hint">
+      <span>Press <kbd>Esc</kbd> to close</span>
+      <span>Search is read-only</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Settings Modal ───────────────────────────────────── -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+
+    <div class="settings-header">
+      <div class="settings-title">
+        Settings
+        <span>Preferences are saved automatically</span>
+      </div>
+      <button class="settings-close-x" id="settingsCloseX" aria-label="Close settings">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="settings-body">
+
+      <!-- Accent Colour -->
+      <div>
+        <div class="settings-section-label">Accent Colour</div>
+        <div class="color-row">
+          <div class="color-swatch-grid" id="colorSwatches"></div>
+          <div class="color-custom-wrap">
+            <span class="color-custom-label">Custom</span>
+            <input class="color-picker-input" type="color" id="colorPicker">
+            <input class="color-hex-input" type="text" id="colorHex" maxlength="7" spellcheck="false" placeholder="#630e20">
+          </div>
+        </div>
+      </div>
+
+      <!-- Pinned Games -->
+      <div>
+        <div class="settings-section-label">Pinned Games</div>
+        <div class="pinned-games-list" id="pinnedGamesList">
+          <!-- rows built by JS -->
+        </div>
+        <div style="margin-top:10px; font-family:var(--mono); font-size:10px; color:var(--muted); line-height:1.6;">
+          Enter Place IDs. Changes apply after saving.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="settings-footer">
+      <span class="settings-save-msg" id="settingsSaveMsg">✓ Saved</span>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="settings-btn settings-btn-secondary" id="settingsResetBtn">Reset defaults</button>
+        <button class="settings-btn settings-btn-primary"   id="settingsSaveBtn">Save &amp; Apply</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Constants & defaults
+═══════════════════════════════════════════════════════════ */
+const PROXY      = 'https://corsproxy.io/?';
+const REFRESH    = 30_000;
+const LS_KEY     = 'ghost_dashboard_settings';
+
+const PRESET_COLORS = [
+  '#630e20', '#c0192e', '#1a6b2a', '#0e4fa8',
+  '#7c3aed', '#b45309', '#0e7490', '#be185d',
+];
+
+const DEFAULT_SETTINGS = {
+  accentBase:  '#630e20',
+  pinnedGames: (window.__GAME_IDS || []).slice(0, 3).map(g =>
+    typeof g === 'string' ? g : String(g.placeId)
+  ),
+};
+
+/* ═══════════════════════════════════════════════════════════
+   Settings persistence
+═══════════════════════════════════════════════════════════ */
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+  } catch {}
+  return { ...DEFAULT_SETTINGS };
+}
+
+function saveSettings(s) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Accent colour application
+   We derive light/bright/dim/glow from the base colour
+═══════════════════════════════════════════════════════════ */
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r, g, b];
+}
+
+function lighten(hex, amount) {
+  let [r,g,b] = hexToRgb(hex);
+  r = Math.min(255, r + amount); g = Math.min(255, g + amount); b = Math.min(255, b + amount);
+  return '#' + [r,g,b].map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
+function applyAccent(hex) {
+  // Ensure valid hex
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  const light  = lighten(hex, 60);
+  const bright = lighten(hex, 100);
+  const [r,g,b] = hexToRgb(hex);
+  const [rl,gl,bl] = hexToRgb(light);
+  const root = document.documentElement;
+  root.style.setProperty('--accent',        hex);
+  root.style.setProperty('--accent-light',  light);
+  root.style.setProperty('--accent-bright', bright);
+  root.style.setProperty('--accent-dim',    `rgba(${r},${g},${b},0.2)`);
+  root.style.setProperty('--accent-glow',   `rgba(${rl},${gl},${bl},0.4)`);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   State
+═══════════════════════════════════════════════════════════ */
+let GAMES     = [];
+let activeTab = 0;
+const intervals = [];
+let settings  = loadSettings();
+
+/* ═══════════════════════════════════════════════════════════
+   Helpers
+═══════════════════════════════════════════════════════════ */
+function fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B';
+  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)         return (n / 1_000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+
+async function tryFetch(urls) {
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (r.ok) return r.json();
+    } catch {}
+  }
+  return null;
+}
+async function getUniverseId(placeId) {
+  const base = `https://apis.roblox.com/universes/v1/places/${placeId}/universe`;
+  const j = await tryFetch([base, PROXY + base]);
+  return j?.universeId ?? null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Tab UI
+═══════════════════════════════════════════════════════════ */
+function buildTabs() {
+  const tabsEl = document.getElementById('tabs');
+  tabsEl.innerHTML = '';
+  GAMES.forEach((g, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = g.label || `Game ${i + 1}`;
+    btn.addEventListener('click', () => switchTab(i));
+    tabsEl.appendChild(btn);
+  });
+}
+function switchTab(i) {
+  activeTab = i;
+  document.querySelectorAll('.tab-btn')   .forEach((b, j) => b.classList.toggle('active', j === i));
+  document.querySelectorAll('.game-panel').forEach((p, j) => p.classList.toggle('active', j === i));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Panel HTML
+═══════════════════════════════════════════════════════════ */
+function buildPanel(game, i) {
+  const div = document.createElement('div');
+  div.className = 'game-panel' + (i === 0 ? ' active' : '');
+  div.id = `panel-${i}`;
+  div.innerHTML = `
+    <div class="game-card">
+      <div class="card-header">
+        <div class="game-icon-wrap" id="icon-${i}">
+          <div class="game-icon-placeholder">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="white">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="game-title-area">
+          <div class="place-id-tag">Place ID · ${game.placeId}</div>
+          <div class="game-name" id="name-${i}" translate="no">Loading…</div>
+          <div class="game-creator" id="creator-${i}"></div>
+          <a class="play-btn" href="https://www.roblox.com/games/${game.placeId}" target="_blank" rel="noopener">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Play on Roblox
+          </a>
+        </div>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-cell stat-visits">
+          <div class="stat-label"><span class="stat-icon"></span>Total Visits</div>
+          <div class="stat-value" id="visits-${i}">—</div>
+          <div class="stat-sub" id="visits-exact-${i}">—</div>
+        </div>
+        <div class="stat-cell stat-active">
+          <div class="stat-label"><span class="stat-icon"></span>Active Now</div>
+          <div class="stat-value" id="active-${i}">—</div>
+          <div class="stat-sub">players online</div>
+        </div>
+        <div class="stat-cell stat-ratio">
+          <div class="stat-label"><span class="stat-icon"></span>Like Ratio</div>
+          <div class="stat-value" id="ratio-pct-${i}">—</div>
+          <div class="vote-row">
+            <span class="vote-likes" id="vote-likes-${i}">—</span>
+            <span class="vote-sep">–</span>
+            <span class="vote-dislikes" id="vote-dislikes-${i}">—</span>
+          </div>
+          <div class="ratio-track"><div class="ratio-fill" id="ratio-fill-${i}"></div></div>
+        </div>
+      </div>
+      <div class="update-bar">
+        <span class="dot-blink" style="color:var(--green)"></span>
+        <span>Refreshes every 30s</span>
+        <span class="update-time" id="updated-${i}">—</span>
+      </div>
+    </div>`;
+  return div;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Game data fetching
+═══════════════════════════════════════════════════════════ */
+async function fetchGame(game, i) {
+  if (!game.universeId) {
+    const uid = await getUniverseId(game.placeId);
+    if (!uid) {
+      setEl(`name-${i}`, 'Could not resolve game');
+      document.getElementById('corsNote').classList.add('show');
+      return;
+    }
+    game.universeId = uid;
+  }
+
+  const infoBase  = `https://games.roblox.com/v1/games?universeIds=${game.universeId}&lang=en`;
+  const votesBase = `https://games.roblox.com/v1/games/${game.universeId}/votes`;
+
+  const [infoJson, votesJson] = await Promise.all([
+    tryFetch([infoBase,  PROXY + infoBase]),
+    tryFetch([votesBase, PROXY + votesBase])
+  ]);
+
+  const d = infoJson?.data?.[0];
+  if (!d) { setEl(`name-${i}`, 'Could not load'); document.getElementById('corsNote').classList.add('show'); return; }
+
+  const name     = d.name    || 'Unknown Game';
+  const creator  = d.creator?.name ? `by ${d.creator.name}` : '';
+  const visits   = d.visits  ?? null;
+  const playing  = d.playing ?? null;
+  const likes    = votesJson?.upVotes   ?? null;
+  const dislikes = votesJson?.downVotes ?? null;
+  const total    = (likes ?? 0) + (dislikes ?? 0);
+  const pct      = total > 0 ? Math.round(((likes ?? 0) / total) * 100) : null;
+
+  setEl(`name-${i}`,          name);
+  setEl(`creator-${i}`,       creator);
+  setEl(`visits-${i}`,        fmt(visits));
+  setEl(`visits-exact-${i}`,  visits != null ? visits.toLocaleString() + ' total' : '—');
+  setEl(`active-${i}`,        fmt(playing));
+  setEl(`ratio-pct-${i}`,     pct != null ? pct + '%' : '—');
+  setEl(`vote-likes-${i}`,    likes    != null ? fmt(likes)    + ' 👍' : '—');
+  setEl(`vote-dislikes-${i}`, dislikes != null ? fmt(dislikes) + ' 👎' : '—');
+  setEl(`updated-${i}`,       'Updated ' + new Date().toLocaleTimeString());
+
+  const fill = document.getElementById(`ratio-fill-${i}`);
+  if (fill) fill.style.width = (pct ?? 0) + '%';
+
+  const btn = document.querySelectorAll('.tab-btn')[i];
+  if (btn) btn.textContent = name.length > 20 ? name.slice(0, 18) + '…' : name;
+
+  fetchIcon(game, i);
+}
+
+async function fetchIcon(game, i) {
+  const base = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${game.universeId}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`;
+  const j    = await tryFetch([base, PROXY + base]);
+  const url  = j?.data?.[0]?.imageUrl;
+  if (!url) return;
+  const wrap = document.getElementById(`icon-${i}`);
+  if (!wrap) return;
+  const img = document.createElement('img');
+  img.className = 'game-icon'; img.src = url; img.alt = 'Game icon';
+  img.onerror = () => {
+    const ph = document.createElement('div'); ph.className = 'game-icon-placeholder';
+    ph.innerHTML = `<svg width="34" height="34" viewBox="0 0 24 24" fill="white" style="opacity:.2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>`;
+    wrap.replaceWith(ph);
+  };
+  wrap.innerHTML = ''; wrap.appendChild(img);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Build / reload dashboard
+═══════════════════════════════════════════════════════════ */
+function buildDashboard(placeIds) {
+  // Clear intervals
+  intervals.forEach(clearInterval); intervals.length = 0;
+
+  // Normalise game list
+  GAMES = placeIds.filter(Boolean).slice(0, 3).map((id, i) => ({
+    placeId: String(id).trim(),
+    label: `Game ${i + 1}`,
+  }));
+
+  buildTabs();
+  switchTab(0);
+
+  const panelsEl = document.getElementById('panels');
+  panelsEl.innerHTML = '';
+  GAMES.forEach((g, i) => {
+    panelsEl.appendChild(buildPanel(g, i));
+    fetchGame(g, i);
+    intervals.push(setInterval(() => fetchGame(g, i), REFRESH));
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Search modal
+═══════════════════════════════════════════════════════════ */
+const searchBtn     = document.getElementById('searchBtn');
+const searchOverlay = document.getElementById('searchOverlay');
+const searchInput   = document.getElementById('searchInput');
+const searchGoBtn   = document.getElementById('searchGoBtn');
+const searchResult  = document.getElementById('searchResult');
+
+function openSearch()  { searchOverlay.classList.add('open'); searchBtn.classList.add('active'); setTimeout(() => searchInput.focus(), 60); }
+function closeSearch() { searchOverlay.classList.remove('open'); searchBtn.classList.remove('active'); searchInput.value = ''; searchResult.classList.add('hidden'); searchResult.innerHTML = ''; }
+
+searchBtn.addEventListener('click', () => searchOverlay.classList.contains('open') ? closeSearch() : openSearch());
+searchOverlay.addEventListener('click', e => { if (e.target === searchOverlay) closeSearch(); });
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+searchGoBtn.addEventListener('click', runSearch);
+
+async function runSearch() {
+  const raw = searchInput.value.trim().replace(/\D/g, '');
+  if (!raw) return;
+  searchResult.classList.remove('hidden');
+  searchResult.innerHTML = `<div class="search-loading"><div class="spinner"></div>Looking up Place ID ${raw}…</div>`;
+
+  const uid = await getUniverseId(raw);
+  if (!uid) { searchResult.innerHTML = `<div class="search-error">⚠ Could not find a game with Place ID <strong>${raw}</strong>.<br>Check the ID and try again.</div>`; return; }
+
+  const infoBase  = `https://games.roblox.com/v1/games?universeIds=${uid}&lang=en`;
+  const votesBase = `https://games.roblox.com/v1/games/${uid}/votes`;
+  const iconBase  = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${uid}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`;
+
+  const [infoJson, votesJson, iconJson] = await Promise.all([
+    tryFetch([infoBase, PROXY+infoBase]),
+    tryFetch([votesBase,PROXY+votesBase]),
+    tryFetch([iconBase, PROXY+iconBase])
+  ]);
+
+  const d = infoJson?.data?.[0];
+  if (!d) { searchResult.innerHTML = `<div class="search-error">⚠ Could not load data. Try again.</div>`; return; }
+
+  const name     = d.name || 'Unknown Game';
+  const creator  = d.creator?.name ? `by ${d.creator.name}` : '';
+  const visits   = d.visits ?? null;
+  const playing  = d.playing ?? null;
+  const likes    = votesJson?.upVotes ?? null;
+  const dislikes = votesJson?.downVotes ?? null;
+  const total    = (likes??0)+(dislikes??0);
+  const pct      = total>0 ? Math.round(((likes??0)/total)*100) : null;
+  const iconUrl  = iconJson?.data?.[0]?.imageUrl ?? null;
+
+  const iconHTML = iconUrl
+    ? `<img class="search-result-icon" src="${iconUrl}" alt="icon">`
+    : `<div class="search-result-icon-ph"><svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="opacity:.2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>`;
+
+  searchResult.innerHTML = `
+    <div class="search-result-card">
+      <div class="search-result-inner">
+        ${iconHTML}
+        <div class="search-result-info">
+          <div class="search-result-name" translate="no">${name}</div>
+          <div class="search-result-creator">${creator}</div>
+          <div class="search-result-stats">
+            <span><span class="visits-val">${fmt(visits)}</span> visits</span>
+            <span><span class="active-val">${fmt(playing)}</span> online</span>
+            ${pct!=null?`<span style="color:var(--orange)">${pct}% liked</span>`:''}
+            ${likes!=null?`<span style="color:var(--green)">${fmt(likes)} 👍</span>`:''}
+            ${dislikes!=null?`<span style="color:var(--red)">${fmt(dislikes)} 👎</span>`:''}
+          </div>
+        </div>
+      </div>
+      <div class="search-result-actions">
+        <a class="search-open-btn" href="https://www.roblox.com/games/${raw}" target="_blank" rel="noopener">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Play on Roblox
+        </a>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Settings modal
+═══════════════════════════════════════════════════════════ */
+const settingsBtn     = document.getElementById('settingsBtn');
+const settingsOverlay = document.getElementById('settingsOverlay');
+const settingsCloseX  = document.getElementById('settingsCloseX');
+const settingsSaveBtn = document.getElementById('settingsSaveBtn');
+const settingsResetBtn= document.getElementById('settingsResetBtn');
+const settingsSaveMsg = document.getElementById('settingsSaveMsg');
+const colorPicker     = document.getElementById('colorPicker');
+const colorHex        = document.getElementById('colorHex');
+
+// ── build colour swatches
+const swatchGrid = document.getElementById('colorSwatches');
+PRESET_COLORS.forEach(hex => {
+  const sw = document.createElement('button');
+  sw.className = 'color-swatch';
+  sw.style.background = hex;
+  sw.title = hex;
+  sw.dataset.hex = hex;
+  sw.addEventListener('click', () => setColorUI(hex));
+  swatchGrid.appendChild(sw);
+});
+
+// ── build pinned game rows
+const pinnedList = document.getElementById('pinnedGamesList');
+for (let i = 0; i < 3; i++) {
+  const row = document.createElement('div');
+  row.className = 'pinned-game-row';
+  row.innerHTML = `
+    <span class="pinned-game-num">${i+1}</span>
+    <input class="pinned-game-input" id="pinnedInput-${i}" type="text"
+      inputmode="numeric" placeholder="Place ID" autocomplete="off" spellcheck="false">
+    <span class="pinned-game-status" id="pinnedStatus-${i}"></span>`;
+  pinnedList.appendChild(row);
+}
+
+function setColorUI(hex) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  colorPicker.value = hex;
+  colorHex.value    = hex;
+  document.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.classList.toggle('selected', sw.dataset.hex === hex);
+  });
+  applyAccent(hex); // live preview
+}
+
+function openSettings() {
+  // Populate fields from current settings
+  setColorUI(settings.accentBase);
+  settings.pinnedGames.forEach((id, i) => {
+    const inp = document.getElementById(`pinnedInput-${i}`);
+    if (inp) inp.value = id || '';
+  });
+  settingsOverlay.classList.add('open');
+  settingsBtn.classList.add('active');
+}
+
+function closeSettings() {
+  settingsOverlay.classList.remove('open');
+  settingsBtn.classList.remove('active');
+}
+
+settingsBtn.addEventListener('click', () => settingsOverlay.classList.contains('open') ? closeSettings() : openSettings());
+settingsCloseX.addEventListener('click', closeSettings);
+settingsOverlay.addEventListener('click', e => { if (e.target === settingsOverlay) closeSettings(); });
+
+// Sync colour picker ↔ hex input ↔ swatches
+colorPicker.addEventListener('input', () => setColorUI(colorPicker.value));
+colorHex.addEventListener('input', () => {
+  const v = colorHex.value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) setColorUI(v);
+});
+colorHex.addEventListener('keydown', e => { if (e.key === 'Enter') settingsSaveBtn.click(); });
+
+// Save
+settingsSaveBtn.addEventListener('click', () => {
+  const newColor = colorHex.value.trim();
+  const newGames = [0,1,2].map(i => (document.getElementById(`pinnedInput-${i}`)?.value.trim().replace(/\D/g,'') || ''));
+
+  if (!/^#[0-9a-fA-F]{6}$/.test(newColor)) {
+    colorHex.style.borderColor = 'var(--red)';
+    setTimeout(() => colorHex.style.borderColor = '', 1200);
+    return;
+  }
+
+  settings.accentBase  = newColor;
+  settings.pinnedGames = newGames;
+  saveSettings(settings);
+  applyAccent(newColor);
+
+  // Flash save message
+  settingsSaveMsg.classList.add('show');
+  setTimeout(() => settingsSaveMsg.classList.remove('show'), 2000);
+
+  // Rebuild dashboard with new game IDs
+  buildDashboard(newGames);
+
+  // Close after short delay so user sees the ✓
+  setTimeout(closeSettings, 700);
+});
+
+// Reset
+settingsResetBtn.addEventListener('click', () => {
+  settings = { ...DEFAULT_SETTINGS };
+  saveSettings(settings);
+  setColorUI(settings.accentBase);
+  settings.pinnedGames.forEach((id, i) => {
+    const inp = document.getElementById(`pinnedInput-${i}`);
+    if (inp) inp.value = id || '';
+  });
+  applyAccent(settings.accentBase);
+  buildDashboard(settings.pinnedGames);
+  settingsSaveMsg.classList.add('show');
+  setTimeout(() => settingsSaveMsg.classList.remove('show'), 2000);
+  setTimeout(closeSettings, 700);
+});
+
+// Global escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeSearch(); closeSettings(); }
+  if (e.key === 'k' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); openSearch(); }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   Boot
+═══════════════════════════════════════════════════════════ */
+function init() {
+  // Apply saved accent colour immediately
+  applyAccent(settings.accentBase);
+
+  // Determine which game IDs to use:
+  // saved settings take priority over ids.js
+  let ids = settings.pinnedGames;
+
+  // Fall back to ids.js if saved list is empty
+  if (!ids || ids.every(x => !x)) {
+    const raw = window.__GAME_IDS;
+    if (!Array.isArray(raw) || raw.length === 0) {
+      document.getElementById('panels').innerHTML =
+        `<div class="panel-error">⚠ <strong>ids.js</strong> is missing or empty.<br>Make sure ids.js is in the same folder.</div>`;
+      return;
+    }
+    ids = raw.slice(0, 3).map(g => typeof g === 'string' ? g : String(g.placeId));
+    settings.pinnedGames = ids;
+  }
+
+  buildDashboard(ids);
+}
+
+init();
+</script>
+</body>
+</html>
