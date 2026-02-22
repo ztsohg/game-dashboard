@@ -404,8 +404,7 @@ function buildDashboard(placeIds) {
 /* ═══════════════════════════════════════════════════════════
    Popular Games  ── Rolimons + Roblox API
 ═══════════════════════════════════════════════════════════ */
-const ROLIMONS = 'https://api.rolimons.com/games/v1/gamelist';
-const TOP_N    = 25;
+const TOP_N = 25;
 
 function showPopularSkeletons() {
   const list = document.getElementById('popularList');
@@ -421,93 +420,31 @@ function showPopularSkeletons() {
     </div>`).join('');
 }
 
-async function loadPopularGames() {
-  const btn = document.getElementById('popularRefreshBtn');
-  btn.classList.add('spinning');
-  setEl('popularMeta', 'Loading…');
-  showPopularSkeletons();
-
-  // 1. Fetch rolimons game list — tryFetch handles direct + all proxies
-  const roliData = await tryFetch(ROLIMONS);
-
-  if (!roliData?.games) {
-    document.getElementById('popularList').innerHTML =
-      `<div class="popular-error">⚠ Could not load popular games list.<br>Rolimons API may be temporarily unavailable.<br><br>Make sure your CORS proxy is reachable or try again.</div>`;
-    setEl('popularMeta', 'Failed');
-    btn.classList.remove('spinning');
-    return;
-  }
-
-  // 2. Sort by active players descending, take top N
-  const sorted = Object.entries(roliData.games)
-    .map(([placeId, arr]) => ({ placeId, name: arr[0], activePlayers: arr[1] ?? 0, icon: arr[2] ?? null }))
-    .sort((a, b) => b.activePlayers - a.activePlayers)
-    .slice(0, TOP_N);
-
-  // 3. Resolve universe IDs — throttle to 5 at a time to avoid flooding proxy
-  async function resolveInBatches(games, batchSize) {
-    const results = [];
-    for (let i = 0; i < games.length; i += batchSize) {
-      const batch = games.slice(i, i + batchSize);
-      const ids = await Promise.all(batch.map(g => getUniverseId(g.placeId)));
-      results.push(...ids);
-    }
-    return results;
-  }
-  const universeIds = await resolveInBatches(sorted, 5);
-  sorted.forEach((g, i) => { g.universeId = universeIds[i]; });
-
-  // 4. Fetch full game info + votes in batches of 10 (API limit)
-  const validGames = sorted.filter(g => g.universeId);
-  const batches    = chunk(validGames, 10);
-
-  const infoMap  = {};
-  const votesMap = {};
-
-  await Promise.all(batches.map(async batch => {
-    const uids = batch.map(g => g.universeId).join(',');
-    const infoBase = `https://games.roblox.com/v1/games?universeIds=${uids}&lang=en`;
-    const infoJson = await tryFetch(infoBase);
-    (infoJson?.data ?? []).forEach(d => { infoMap[d.id] = d; });
-
-    // Votes must be fetched individually
-    await Promise.all(batch.map(async g => {
-      const base = `https://games.roblox.com/v1/games/${g.universeId}/votes`;
-      const j = await tryFetch(base);
-      if (j) votesMap[g.universeId] = j;
-    }));
-  }));
-
-  // 5. Render rows
-  const now = new Date().toLocaleTimeString();
+function renderPopularRows(games) {
   const list = document.getElementById('popularList');
   list.innerHTML = '';
-
-  sorted.forEach((g, idx) => {
-    const rank    = idx + 1;
-    const uid     = g.universeId;
-    const info    = uid ? infoMap[uid] : null;
-    const votes   = uid ? votesMap[uid] : null;
-
-    const name    = info?.name ?? g.name ?? 'Unknown';
-    const creator = info?.creator?.name ? `by ${info.creator.name}` : '';
-    const visits  = info?.visits ?? null;
-    const playing = info?.playing ?? g.activePlayers ?? null;
-    const updated = info?.updated ? new Date(info.updated).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}) : '—';
-    const likes   = votes?.upVotes ?? null;
-    const dislikes= votes?.downVotes ?? null;
-    const total   = (likes??0)+(dislikes??0);
-    const pct     = total > 0 ? Math.round(((likes??0)/total)*100) : null;
+  games.forEach(g => {
+    const rank     = g.rank;
+    const name     = g.name     || 'Unknown';
+    const creator  = g.creator  ? `by ${g.creator}` : '';
+    const visits   = g.visits   ?? null;
+    const playing  = g.playing  ?? null;
+    const likes    = g.likes    ?? null;
+    const dislikes = g.dislikes ?? null;
+    const pct      = g.likeRatio ?? null;
+    const updated  = g.updated
+      ? new Date(g.updated).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'})
+      : '—';
 
     const iconEl = g.icon
-      ? `<img class="pop-icon" src="${g.icon}" alt="${name}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pop-icon-ph',innerHTML:'<svg width=20 height=20 viewBox=\\'0 0 24 24\\' fill=\\'white\\' style=\\'opacity:.15\\'><path d=\\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\\'/></svg>'}));">`
+      ? `<img class="pop-icon" src="${g.icon}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'pop-icon-ph',innerHTML:'<svg width=20 height=20 viewBox=\'0 0 24 24\' fill=\'white\' style=\'opacity:.15\'><path d=\'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z\'/></svg>'}));">`
       : `<div class="pop-icon-ph"><svg width="20" height="20" viewBox="0 0 24 24" fill="white" style="opacity:.15"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>`;
 
     const row = document.createElement('a');
     row.className = 'popular-row';
-    row.href = `https://www.roblox.com/games/${g.placeId}`;
-    row.target = '_blank';
-    row.rel = 'noopener';
+    row.href      = `https://www.roblox.com/games/${g.placeId}`;
+    row.target    = '_blank';
+    row.rel       = 'noopener';
     row.innerHTML = `
       <span class="pop-rank${rank <= 3 ? ' top3' : ''}">${rank}</span>
       ${iconEl}
@@ -524,15 +461,44 @@ async function loadPopularGames() {
         <div class="pop-stat-label">playing now</div>
       </div>
       <div class="pop-stat pop-ratio">
-        <div class="pop-stat-val">${pct != null ? pct+'%' : '—'}</div>
+        <div class="pop-stat-val">${pct != null ? pct + '%' : '—'}</div>
         <div class="pop-stat-label">${likes != null ? fmt(likes)+'👍 '+fmt(dislikes)+'👎' : 'no votes'}</div>
         <div class="pop-ratio-bar"><div class="pop-ratio-fill" style="width:${pct??0}%"></div></div>
       </div>
       <div class="pop-updated">${updated}</div>`;
     list.appendChild(row);
   });
+}
 
-  setEl('popularMeta', `Updated ${now}`);
+async function loadPopularGames() {
+  const btn = document.getElementById('popularRefreshBtn');
+  btn.classList.add('spinning');
+  setEl('popularMeta', 'Loading…');
+  showPopularSkeletons();
+
+  try {
+    // popular.json is a static file generated by GitHub Actions — zero CORS issues on any device
+    const r = await fetch('popular.json?v=' + Date.now());
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (!Array.isArray(data.games) || data.games.length === 0) throw new Error('empty');
+
+    renderPopularRows(data.games.slice(0, TOP_N));
+
+    const genAt = data.generatedAt
+      ? new Date(data.generatedAt).toLocaleTimeString()
+      : new Date().toLocaleTimeString();
+    setEl('popularMeta', `Data from ${genAt}`);
+
+  } catch (err) {
+    document.getElementById('popularList').innerHTML =
+      `<div class="popular-error">
+        ⚠ Could not load <strong>popular.json</strong>.<br><br>
+        Go to your repo → <strong>Actions</strong> → <em>Update Popular Games</em> → <strong>Run workflow</strong> to generate it.
+      </div>`;
+    setEl('popularMeta', 'Failed');
+  }
+
   btn.classList.remove('spinning');
 }
 
