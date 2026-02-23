@@ -76,14 +76,7 @@
     </div>
   </section>
 
-  <div class="cors-note" id="corsNote">
-    <strong>⚠ CORS Restriction Detected</strong><br>
-    Browsers block direct calls to the Roblox API when opening HTML files locally.
-    Use one of these options:<br><br>
-    Chrome: <code>chrome --disable-web-security --user-data-dir=/tmp/rbx-test</code><br>
-    Firefox: install the <strong>CORS Everywhere</strong> extension.<br>
-    Or: <code>npx serve .</code>
-  </div>
+
 
 </div>
 
@@ -328,7 +321,7 @@ function buildPanel(game, i) {
 async function fetchGame(game, i) {
   if (!game.universeId) {
     const uid = await getUniverseId(game.placeId);
-    if (!uid) { setEl(`name-${i}`, 'Could not resolve game'); document.getElementById('corsNote').classList.add('show'); return; }
+    if (!uid) { setEl(`name-${i}`, 'Could not resolve game'); return; }
     game.universeId = uid;
   }
   const infoBase  = `https://games.roblox.com/v1/games?universeIds=${game.universeId}&lang=en`;
@@ -338,7 +331,7 @@ async function fetchGame(game, i) {
     tryFetch(votesBase)
   ]);
   const d = infoJson?.data?.[0];
-  if (!d) { setEl(`name-${i}`, 'Could not load'); document.getElementById('corsNote').classList.add('show'); return; }
+  if (!d) { setEl(`name-${i}`, 'Could not load'); return; }
 
   const name     = d.name || 'Unknown Game';
   const creator  = d.creator?.name ? `by ${d.creator.name}` : '';
