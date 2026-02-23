@@ -160,7 +160,7 @@
 // ── YOUR CLOUDFLARE WORKER URL ───────────────────────────
 // Deploy worker.js to https://workers.cloudflare.com (free)
 // then replace the placeholder below with your worker URL.
-const WORKER_URL = 'https://gentle-pond-6ad4.senka090710.workers.dev/';
+const WORKER_URL = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev';
 // ─────────────────────────────────────────────────────────
 const REFRESH       = 30_000;
 const POPULAR_REFRESH = 5 * 60_000; // refresh live stats every 5 min
@@ -391,37 +391,7 @@ function buildDashboard(placeIds) {
    Popular Games  ── Rolimons + Roblox API
 ═══════════════════════════════════════════════════════════ */
 const TOP_N = 25;
-
-// ── Hardcoded top Roblox game universe IDs (rarely changes at the top) ──
-// These are resolved to universeIds already so we skip the place→universe lookup.
-// Format: [placeId, universeId]
-const POPULAR_GAMES = [
-  ['2753915549',   '1534453623'], // Blox Fruits
-  ['6284583030',   '3232595591'], // Brookhaven RP
-  ['189707',       '301549609' ], // Natural Disaster Survival
-  ['5449601364',   '4483381587'], // Adopt Me!... (Pet Ranch Sim backup)
-  ['3260590327',   '2414851778'], // Adopt Me!
-  ['1537690962',   '1212583594'], // Murder Mystery 2
-  ['142823291',    '142823291' ], // MeepCity
-  ['606849621',    '606849621' ], // Jailbreak
-  ['4872321990',   '4006353678'], // Anime Defenders
-  ['2669548526',   '2669548526'], // Tower of Hell
-  ['2788229376',   '2788229376'], // Doors
-  ['1962086868',   '1962086868'], // Royale High
-  ['7415484311',   '7415484311'], // Da Hood
-  ['12917818255',  '12917818255'], // Type Soul
-  ['8737602449',   '8737602449' ], // Blue Lock: Rivals
-  ['13772394625',  '13772394625'], // Rivals
-  ['3085733838',   '3085733838' ], // Shindo Life
-  ['4924922222',   '4924922222' ], // Anime Fighting Simulator X
-  ['286090429',    '286090429'  ], // Dungeon Quest
-  ['1090809774',   '1090809774' ], // Pet Simulator 99
-  ['15532962292',  '15532962292'], // Infinite Incremental
-  ['5350492138',   '5350492138' ], // Fisch
-  ['3121767607',   '3121767607' ], // Gym League
-  ['4585465792',   '4585465792' ], // King Legacy
-  ['10449761463',  '10449761463'], // Steal Time From Others
-];
+const ROLIMONS_URL = 'https://api.rolimons.com/games/v1/gamelist';
 
 function showPopularSkeletons() {
   const list = document.getElementById('popularList');
@@ -490,47 +460,58 @@ async function loadPopularGames() {
   setEl('popularMeta', 'Loading…');
   showPopularSkeletons();
 
-  // Batch-fetch info for all games at once (10 per request max)
-  const uids    = POPULAR_GAMES.map(g => g[1]);
-  const batches = chunk(uids, 10);
+  // 1. Fetch Rolimons via worker (no CORS issues since worker fetches server-side)
+  const roliData = await tryFetch(ROLIMONS_URL);
 
-  const infoMap  = {};
-  const votesMap = {};
-  const iconMap  = {};
+  if (!roliData?.games) {
+    list.innerHTML = `<div class="popular-error">⚠ Could not load popular games list. Try refreshing.</div>`;
+    setEl('popularMeta', 'Failed');
+    btn.classList.remove('spinning');
+    return;
+  }
 
-  // Fetch info + icons in parallel across batches
-  await Promise.all(batches.map(async batch => {
-    const uidStr   = batch.join(',');
-    const infoUrl  = `https://games.roblox.com/v1/games?universeIds=${uidStr}&lang=en`;
-    const iconUrl  = `https://thumbnails.roblox.com/v1/games/icons?universeIds=${uidStr}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`;
+  // 2. Sort by active players, take top N — gives us real current rankings
+  const top = Object.entries(roliData.games)
+    .map(([placeId, arr]) => ({ placeId, name: arr[0], activePlayers: arr[1] ?? 0, icon: arr[2] ?? null }))
+    .sort((a, b) => b.activePlayers - a.activePlayers)
+    .slice(0, TOP_N);
 
+  // 3. Resolve universe IDs (needed for Roblox API calls) — batched 5 at a time
+  for (let i = 0; i < top.length; i += 5) {
+    await Promise.all(top.slice(i, i + 5).map(async g => {
+      const j = await tryFetch(`https://apis.roblox.com/universes/v1/places/${g.placeId}/universe`);
+      g.universeId = j?.universeId ?? null;
+    }));
+  }
+
+  const valid = top.filter(g => g.universeId);
+
+  // 4. Batch-fetch game info + icons (10 per request)
+  const infoMap = {}, iconMap = {}, votesMap = {};
+
+  await Promise.all(chunk(valid, 10).map(async batch => {
+    const uids = batch.map(g => g.universeId).join(',');
     const [infoJ, iconJ] = await Promise.all([
-      tryFetch(infoUrl),
-      tryFetch(iconUrl),
+      tryFetch(`https://games.roblox.com/v1/games?universeIds=${uids}&lang=en`),
+      tryFetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${uids}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`),
     ]);
-
-    (infoJ?.data  ?? []).forEach(d => { infoMap[String(d.id)] = d; });
-    (iconJ?.data  ?? []).forEach(d => { iconMap[String(d.targetId)] = d.imageUrl; });
+    (infoJ?.data ?? []).forEach(d => { infoMap[String(d.id)] = d; });
+    (iconJ?.data ?? []).forEach(d => { iconMap[String(d.targetId)] = d.imageUrl; });
   }));
 
-  // Fetch votes individually (no batch endpoint)
-  await Promise.all(POPULAR_GAMES.map(async ([, uid]) => {
-    const j = await tryFetch(`https://games.roblox.com/v1/games/${uid}/votes`);
-    if (j) votesMap[uid] = j;
+  // 5. Fetch votes individually
+  await Promise.all(valid.map(async g => {
+    const j = await tryFetch(`https://games.roblox.com/v1/games/${g.universeId}/votes`);
+    if (j) votesMap[g.universeId] = j;
   }));
 
-  // Sort by playing count descending
-  const sorted = [...POPULAR_GAMES].sort((a, b) => {
-    const pa = infoMap[a[1]]?.playing ?? 0;
-    const pb = infoMap[b[1]]?.playing ?? 0;
-    return pb - pa;
-  });
-
-  // Render rows
+  // 6. Render — already sorted by player count from Rolimons
   list.innerHTML = '';
-  sorted.forEach(([placeId, uid], idx) => {
-    const row = buildPopularRow(idx + 1, placeId, infoMap[uid], votesMap[uid], iconMap[uid]);
-    list.appendChild(row);
+  top.forEach((g, idx) => {
+    const uid = g.universeId;
+    // Use Rolimons icon as fallback since it's already in the data
+    const iconUrl = (uid && iconMap[String(uid)]) || g.icon;
+    list.appendChild(buildPopularRow(idx + 1, g.placeId, infoMap[String(uid)], votesMap[uid], iconUrl));
   });
 
   setEl('popularMeta', `Updated ${new Date().toLocaleTimeString()}`);
