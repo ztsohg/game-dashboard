@@ -6,7 +6,6 @@
   <meta name="google" content="notranslate">
   <title>Ghost's Dashboard</title>
   <link rel="stylesheet" href="dashboard.css">
-  <link rel="icon" href="https://tr.rbxcdn.com/180DAY-8a694013f87cbabf7409e62a68e58b4b/150/150/Image/Webp/noFilter" type="image/x-icon">
 </head>
 <body>
 
@@ -423,6 +422,7 @@ function buildPopularRow(rank, placeId, info, votes, iconUrl) {
   row.href      = `https://www.roblox.com/games/${placeId}`;
   row.target    = '_blank';
   row.rel       = 'noopener';
+  if (rank <= 3) row.classList.add(`rank-${rank}`);
   row.innerHTML = `
     <span class="pop-rank${rank <= 3 ? ' top3' : ''}">${rank}</span>
     ${iconEl}
