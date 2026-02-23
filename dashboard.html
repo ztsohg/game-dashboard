@@ -157,20 +157,9 @@
 /* ═══════════════════════════════════════════════════════════
    Constants & defaults
 ═══════════════════════════════════════════════════════════ */
-// RoProxy mirrors roblox.com endpoints with CORS enabled — purpose-built for browser use
-// Usage: replace roblox.com subdomains with roproxy.com equivalents
-function toRoProxy(url) {
-  return url
-    .replace('games.roblox.com',       'games.roproxy.com')
-    .replace('thumbnails.roblox.com',  'thumbnails.roproxy.com')
-    .replace('apis.roblox.com',        'apis.roproxy.com');
-}
-
-// Generic CORS proxies as last-resort fallback
-const GENERIC_PROXIES = [
-  'https://corsproxy.io/?',
-  'https://api.allorigins.win/raw?url=',
-];
+// ── YOUR CLOUDFLARE WORKER URL ───────────────────────────
+const WORKER_URL = 'https://gentle-pond-6ad4.senka090710.workers.dev/';
+// ─────────────────────────────────────────────────────────
 const REFRESH       = 30_000;
 const POPULAR_REFRESH = 5 * 60_000; // refresh live stats every 5 min
 const LS_KEY        = 'ghost_dashboard_settings';
@@ -238,37 +227,14 @@ function fmt(n) {
 }
 function setEl(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
-async function tryFetch(urls) {
-  const targets = Array.isArray(urls) ? urls : [urls];
+async function tryFetch(url) {
   const headers = { 'Accept': 'application/json', 'Accept-Language': 'en-US,en;q=0.9' };
-
-  for (const url of targets) {
-    // 1. Direct
-    try {
-      const r = await fetch(url, { headers });
-      if (r.ok) return r.json();
-    } catch {}
-
-    // 2. RoProxy — mirrors roblox.com subdomains with CORS headers, purpose-built for browsers
-    const roproxy = toRoProxy(url);
-    if (roproxy !== url) {
-      try {
-        const r = await fetch(roproxy, { headers });
-        if (r.ok) return r.json();
-      } catch {}
-    }
-
-    // 3. Generic CORS proxies as last resort
-    for (const proxy of GENERIC_PROXIES) {
-      try {
-        const r = await fetch(proxy + encodeURIComponent(url), { headers });
-        if (r.ok) return r.json();
-      } catch {}
-    }
-  }
+  try {
+    const r = await fetch(`${WORKER_URL}?url=${encodeURIComponent(url)}`, { headers });
+    if (r.ok) return r.json();
+  } catch {}
   return null;
 }
-async function getUniverseId(placeId) {
   const base = `https://apis.roblox.com/universes/v1/places/${placeId}/universe`;
   const j = await tryFetch(base);
   return j?.universeId ?? null;
