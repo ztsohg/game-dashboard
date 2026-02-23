@@ -158,7 +158,9 @@
    Constants & defaults
 ═══════════════════════════════════════════════════════════ */
 // ── YOUR CLOUDFLARE WORKER URL ───────────────────────────
-const WORKER_URL = 'https://gentle-pond-6ad4.senka090710.workers.dev/';
+// Deploy worker.js to https://workers.cloudflare.com (free)
+// then replace the placeholder below with your worker URL.
+const WORKER_URL = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev';
 // ─────────────────────────────────────────────────────────
 const REFRESH       = 30_000;
 const POPULAR_REFRESH = 5 * 60_000; // refresh live stats every 5 min
@@ -235,6 +237,7 @@ async function tryFetch(url) {
   } catch {}
   return null;
 }
+async function getUniverseId(placeId) {
   const base = `https://apis.roblox.com/universes/v1/places/${placeId}/universe`;
   const j = await tryFetch(base);
   return j?.universeId ?? null;
