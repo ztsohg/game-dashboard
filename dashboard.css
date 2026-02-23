@@ -849,6 +849,141 @@ header {
   color: var(--accent-bright);
 }
 
+/* ── Top 3 medal rows ─────────────────────────────────── */
+
+/* Shared: diagonal line pattern + left-to-right gradient fade */
+.popular-row.rank-1,
+.popular-row.rank-2,
+.popular-row.rank-3 {
+  position: relative;
+  border-bottom: 1px solid transparent;
+}
+
+/* Pattern layer (pseudo-element behind content) */
+.popular-row.rank-1::before,
+.popular-row.rank-2::before,
+.popular-row.rank-3::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* diagonal lines */
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 10px,
+      rgba(255,255,255,0.025) 10px,
+      rgba(255,255,255,0.025) 11px
+    );
+}
+
+/* Colour gradient layer */
+.popular-row.rank-1::after,
+.popular-row.rank-2::after,
+.popular-row.rank-3::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Gold — #1 */
+.popular-row.rank-1 {
+  background: linear-gradient(
+    90deg,
+    rgba(212,175,55,0.18) 0%,
+    rgba(212,175,55,0.07) 50%,
+    transparent 100%
+  );
+  border-bottom-color: rgba(212,175,55,0.15);
+  box-shadow: inset 3px 0 0 rgba(212,175,55,0.7);
+}
+.popular-row.rank-1::before {
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 10px,
+      rgba(212,175,55,0.06) 10px,
+      rgba(212,175,55,0.06) 11px
+    );
+}
+.popular-row.rank-1 .pop-rank {
+  color: #f5c842;
+  text-shadow: 0 0 12px rgba(212,175,55,0.8);
+  font-size: 15px;
+}
+
+/* Silver — #2 */
+.popular-row.rank-2 {
+  background: linear-gradient(
+    90deg,
+    rgba(180,180,195,0.15) 0%,
+    rgba(180,180,195,0.06) 50%,
+    transparent 100%
+  );
+  border-bottom-color: rgba(180,180,195,0.12);
+  box-shadow: inset 3px 0 0 rgba(192,192,210,0.6);
+}
+.popular-row.rank-2::before {
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 10px,
+      rgba(192,192,210,0.05) 10px,
+      rgba(192,192,210,0.05) 11px
+    );
+}
+.popular-row.rank-2 .pop-rank {
+  color: #c0c8d8;
+  text-shadow: 0 0 10px rgba(192,192,210,0.7);
+  font-size: 14px;
+}
+
+/* Bronze/Copper — #3 */
+.popular-row.rank-3 {
+  background: linear-gradient(
+    90deg,
+    rgba(184,115,51,0.15) 0%,
+    rgba(184,115,51,0.06) 50%,
+    transparent 100%
+  );
+  border-bottom-color: rgba(184,115,51,0.12);
+  box-shadow: inset 3px 0 0 rgba(184,115,51,0.6);
+}
+.popular-row.rank-3::before {
+  background-image:
+    repeating-linear-gradient(
+      60deg,
+      transparent,
+      transparent 10px,
+      rgba(184,115,51,0.06) 10px,
+      rgba(184,115,51,0.06) 11px
+    );
+}
+.popular-row.rank-3 .pop-rank {
+  color: #cd8b4a;
+  text-shadow: 0 0 10px rgba(184,115,51,0.7);
+  font-size: 13px;
+}
+
+/* Make sure cell content sits above the pseudo layers */
+.popular-row.rank-1 > *,
+.popular-row.rank-2 > *,
+.popular-row.rank-3 > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hover tint on top of medal bg */
+.popular-row.rank-1:hover { filter: brightness(1.08); }
+.popular-row.rank-2:hover { filter: brightness(1.08); }
+.popular-row.rank-3:hover { filter: brightness(1.08); }
+
 /* icon */
 .pop-icon {
   width: 40px;
