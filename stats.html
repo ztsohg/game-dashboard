@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en" translate="no" class="notranslate">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>General Statistics — Ghost's Hub</title>
+  <link rel="stylesheet" href="dashboard.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* ── Stats page extra styles ── */
+    .stats-page-header {
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+      position: relative;
+    }
+    .stats-page-header::after {
+      content: ''; position: absolute; bottom: -1px; left: 0;
+      width: 80px; height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+    }
+    .stats-page-header h1 {
+      font-family: var(--display);
+      font-size: 28px; letter-spacing: 3px; color: var(--text);
+      line-height: 1;
+    }
+    .stats-page-header h1 em { font-style: normal; color: var(--accent-bright); }
+    .stats-page-header p {
+      font-family: var(--mono); font-size: 10px; color: var(--muted);
+      letter-spacing: 1.2px; text-transform: uppercase; margin-top: 6px;
+    }
+
+    /* ── Section title ── */
+    .section-title {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px; margin-top: 40px;
+    }
+    .section-title h2 {
+      font-family: var(--display); font-size: 16px; letter-spacing: 2px; color: var(--text);
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 12px; margin-bottom: 0;
+    }
+    .summary-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px;
+      position: relative; overflow: hidden;
+    }
+    .summary-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--card-accent, var(--accent));
+    }
+    .summary-card-label {
+      font-family: var(--mono); font-size: 9px; color: var(--muted);
+      letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .summary-card-value {
+      font-family: var(--display); font-size: 28px; letter-spacing: 1px; line-height: 1;
+      color: var(--card-color, var(--accent-bright));
+    }
+    .summary-card-sub {
+      font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 4px;
+    }
+
+    /* ── Chart card ── */
+    .chart-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+    }
+    .chart-card-header {
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chart-card-title {
+      font-family: var(--display); font-size: 14px; letter-spacing: 1.5px; color: var(--text);
+    }
+    .chart-card-meta {
+      font-family: var(--mono); font-size: 10px; color: var(--muted);
+    }
+    .chart-card-body { padding: 16px 18px; position: relative; }
+    .chart-card-body canvas { max-height: 220px; }
+
+    /* ── Distribution bar ── */
+    .dist-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .dist-row:last-child { border-bottom: none; }
+    .dist-rank {
+      font-family: var(--mono); font-size: 11px; color: var(--muted);
+      width: 24px; flex-shrink: 0; text-align: center;
+    }
+    .dist-icon { width: 32px; height: 32px; border-radius: 6px; object-fit: cover; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); }
+    .dist-icon-ph { width: 32px; height: 32px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .dist-info { flex: 1; min-width: 0; }
+    .dist-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dist-creator { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+    .dist-bar-wrap { width: 140px; flex-shrink: 0; }
+    .dist-bar-track { height: 4px; background: rgba(124,58,237,0.12); border-radius: 99px; overflow: hidden; }
+    .dist-bar-fill { height: 100%; border-radius: 99px; transition: width 0.8s cubic-bezier(0.22,1,0.36,1); }
+    .dist-val { font-family: var(--mono); font-size: 11px; color: var(--text); text-align: right; width: 55px; flex-shrink: 0; }
+    .dist-pct { font-family: var(--mono); font-size: 10px; color: var(--muted); text-align: right; width: 40px; flex-shrink: 0; }
+
+    /* ── History chart controls ── */
+    .history-controls {
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .history-game-btn {
+      padding: 5px 12px; border-radius: var(--radius-sm);
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.5px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .history-game-btn.active {
+      background: var(--accent-dim); border-color: rgba(124,58,237,0.4);
+      color: var(--accent-bright);
+    }
+
+    /* ── Ratio leaderboard ── */
+    .ratio-row {
+      display: flex; align-items: center; gap: 10px; padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .ratio-row:last-child { border-bottom: none; }
+    .ratio-pct {
+      font-family: var(--display); font-size: 18px; letter-spacing: 1px;
+      width: 54px; flex-shrink: 0; text-align: center;
+    }
+    .ratio-fill-wrap { flex: 1; }
+    .ratio-name { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ratio-votes { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+    .ratio-bar-track { height: 3px; background: rgba(124,58,237,0.12); border-radius: 99px; overflow: hidden; margin-top: 4px; }
+    .ratio-bar-fill { height: 100%; border-radius: 99px; }
+
+    /* Loading / empty state */
+    .stats-loading {
+      padding: 60px 24px; text-align: center;
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .stats-loading .spinner { width: 20px; height: 20px; border-width: 2px; }
+
+    @media (max-width: 640px) {
+      .summary-bar { grid-template-columns: repeat(2, 1fr); }
+      .dist-bar-wrap { display: none; }
+    }
+    @media (max-width: 400px) {
+      .summary-bar { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topbar">
+  <a class="topbar-logo" href="dashboard.html">
+    <div class="topbar-sigil">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L4 6.5V12C4 16.1 7.4 19.9 12 21C16.6 19.9 20 16.1 20 12V6.5L12 2Z" stroke="#9d5af5" stroke-width="1.5" fill="rgba(124,58,237,0.1)"/>
+        <path d="M9 12L11 14L15 10" stroke="#9d5af5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="topbar-wordmark">GHOST'S <em>HUB</em></span>
+  </a>
+  <div class="topbar-nav">
+    <a class="topbar-link" href="dashboard.html">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a class="topbar-link active" href="stats.html">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>General Statistics</span>
+    </a>
+  </div>
+  <div class="topbar-live">
+    <span class="dot-blink"></span>
+    Live
+  </div>
+</nav>
+
+<canvas id="bgCanvas"></canvas>
+
+<div class="container">
+
+  <div class="stats-page-header">
+    <h1>GENERAL <em>STATISTICS</em></h1>
+    <p>Top 25 games · Live data · Updated every 5 min</p>
+  </div>
+
+  <div id="statsRoot">
+    <div class="stats-loading">
+      <div class="spinner"></div>
+      Loading statistics…
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   Config — must match dashboard.html
+═══════════════════════════════════════════════════════════ */
+const WORKER_URL     = 'https://gentle-pond-6ad4.senka090710.workers.dev';
+const ROLIMONS_URL   = 'https://api.rolimons.com/games/v1/gamelist';
+const REFRESH_MS     = 5 * 60_000;
+const HISTORY_KEY    = 'jjk_stats_history'; // localStorage key for 7-day history
+const HISTORY_MAX_PTS = 7 * 24 * 6;         // one point per 5 min × 7 days
+
+/* ─── Accent from saved settings ─── */
+const LS_SETTINGS = 'ghost_dashboard_settings';
+function loadAccent() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}');
+    return s.accentBase || '#7c3aed';
+  } catch { return '#7c3aed'; }
+}
+function hexToRgb(h) { return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function lighten(h, a) { return '#' + hexToRgb(h).map(x => Math.min(255,x+a).toString(16).padStart(2,'0')).join(''); }
+function applyAccent(hex) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  const [r,g,b] = hexToRgb(hex);
+  const light = lighten(hex, 60), bright = lighten(hex, 100);
+  const [rl,gl,bl] = hexToRgb(light);
+  const root = document.documentElement;
+  root.style.setProperty('--accent',         hex);
+  root.style.setProperty('--accent-light',   light);
+  root.style.setProperty('--accent-bright',  bright);
+  root.style.setProperty('--accent-dim',     `rgba(${r},${g},${b},0.18)`);
+  root.style.setProperty('--accent-glow',    `rgba(${rl},${gl},${bl},0.35)`);
+  root.style.setProperty('--pattern-accent', `rgba(${r},${g},${b},0.15)`);
+  root.style.setProperty('--pattern-hatch',  `rgba(${r},${g},${b},0.045)`);
+}
+applyAccent(loadAccent());
+
+/* ─── Helpers ─── */
+function fmt(n) {
+  if (n == null) return '—';
+  if (n >= 1e9) return (n/1e9).toFixed(1)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+function chunk(arr, n) { const o=[]; for (let i=0;i<arr.length;i+=n) o.push(arr.slice(i,i+n)); return o; }
+
+async function tryFetch(url) {
+  try {
+    const r = await fetch(`${WORKER_URL}?url=${encodeURIComponent(url)}`, {
+      headers: { 'Accept':'application/json', 'Accept-Language':'en-US,en;q=0.9' }
+    });
+    if (r.ok) return r.json();
+  } catch {}
+  return null;
+}
+
+/* ─── History storage ─── */
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}'); } catch { return {}; }
+}
+function saveHistory(h) { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h)); } catch {} }
+function recordSnapshot(games) {
+  const history = loadHistory();
+  const ts = Date.now();
+  games.forEach(g => {
+    if (!history[g.universeId]) history[g.universeId] = [];
+    history[g.universeId].push({ ts, playing: g.playing ?? 0 });
+    // Keep only last 7 days of points
+    const cutoff = ts - 7 * 24 * 60 * 60 * 1000;
+    history[g.universeId] = history[g.universeId].filter(p => p.ts >= cutoff);
+    if (history[g.universeId].length > HISTORY_MAX_PTS) {
+      history[g.universeId] = history[g.universeId].slice(-HISTORY_MAX_PTS);
+    }
+  });
+  saveHistory(history);
+}
+
+/* ─── Chart defaults ─── */
+Chart.defaults.color = '#3d3555';
+Chart.defaults.borderColor = '#1e1a2e';
+Chart.defaults.font.family = "'Share Tech Mono', monospace";
+
+let activeGames = [];
+let charts = {};
+
+/* ─── Fetch popular games (same pipeline as dashboard) ─── */
+async function fetchPopularGames() {
+  const roliData = await tryFetch(ROLIMONS_URL);
+  if (!roliData?.games) return null;
+
+  const top = Object.entries(roliData.games)
+    .map(([placeId, arr]) => ({ placeId, name: arr[0], activePlayers: arr[1] ?? 0, icon: arr[2] ?? null }))
+    .sort((a, b) => b.activePlayers - a.activePlayers)
+    .slice(0, 25);
+
+  // Resolve universe IDs
+  for (let i = 0; i < top.length; i += 5) {
+    await Promise.all(top.slice(i, i+5).map(async g => {
+      const j = await tryFetch(`https://apis.roblox.com/universes/v1/places/${g.placeId}/universe`);
+      g.universeId = j?.universeId ? String(j.universeId) : null;
+    }));
+  }
+  const valid = top.filter(g => g.universeId);
+
+  const infoMap = {}, iconMap = {}, votesMap = {};
+  await Promise.all(chunk(valid, 10).map(async batch => {
+    const uids = batch.map(g => g.universeId).join(',');
+    const [infoJ, iconJ] = await Promise.all([
+      tryFetch(`https://games.roblox.com/v1/games?universeIds=${uids}&lang=en`),
+      tryFetch(`https://thumbnails.roblox.com/v1/games/icons?universeIds=${uids}&returnPolicy=PlaceHolder&size=150x150&format=Png&isCircular=false`),
+    ]);
+    (infoJ?.data ?? []).forEach(d => { infoMap[String(d.id)] = d; });
+    (iconJ?.data ?? []).forEach(d => { iconMap[String(d.targetId)] = d.imageUrl; });
+  }));
+
+  await Promise.all(valid.map(async g => {
+    const j = await tryFetch(`https://games.roblox.com/v1/games/${g.universeId}/votes`);
+    if (j) votesMap[g.universeId] = j;
+  }));
+
+  const result = top.map((g, idx) => {
+    const info  = g.universeId ? infoMap[g.universeId] : null;
+    const votes = g.universeId ? votesMap[g.universeId] : null;
+    const likes = votes?.upVotes ?? null;
+    const dislikes = votes?.downVotes ?? null;
+    const total = (likes ?? 0) + (dislikes ?? 0);
+    return {
+      rank:        idx + 1,
+      placeId:     g.placeId,
+      universeId:  g.universeId,
+      name:        info?.name || g.name || 'Unknown',
+      creator:     info?.creator?.name || '',
+      visits:      info?.visits ?? null,
+      playing:     info?.playing ?? g.activePlayers ?? 0,
+      likes, dislikes,
+      likeRatio:   total > 0 ? Math.round(((likes ?? 0) / total) * 100) : null,
+      icon:        (g.universeId && iconMap[g.universeId]) || g.icon,
+    };
+  });
+
+  recordSnapshot(result.filter(g => g.universeId));
+  return result;
+}
+
+/* ─── Render ─── */
+function getAccentColor() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#7c3aed';
+}
+function getAccentBright() {
+  return getComputedStyle(document.documentElement).getPropertyValue('--accent-bright').trim() || '#b97eff';
+}
+
+function renderStats(games) {
+  const root = document.getElementById('statsRoot');
+  const accent = getAccentColor();
+  const [ar, ag, ab] = hexToRgb(accent.length === 7 ? accent : '#7c3aed');
+
+  const totalPlaying = games.reduce((s, g) => s + (g.playing ?? 0), 0);
+  const totalVisits  = games.reduce((s, g) => s + (g.visits  ?? 0), 0);
+  const avgRatio     = (() => {
+    const valid = games.filter(g => g.likeRatio != null);
+    return valid.length ? Math.round(valid.reduce((s,g) => s + g.likeRatio, 0) / valid.length) : null;
+  })();
+  const topGame = games[0];
+
+  /* ── History data ── */
+  const history = loadHistory();
+  activeGames = games.filter(g => g.universeId).slice(0, 10);
+
+  root.innerHTML = `
+    <!-- Summary cards -->
+    <div class="summary-bar">
+      <div class="summary-card" style="--card-accent:${accent};--card-color:${getAccentBright()}">
+        <div class="summary-card-label">Total Players Online</div>
+        <div class="summary-card-value">${fmt(totalPlaying)}</div>
+        <div class="summary-card-sub">across top 25 games</div>
+      </div>
+      <div class="summary-card" style="--card-accent:#22c55e;--card-color:#22c55e">
+        <div class="summary-card-label">#1 Right Now</div>
+        <div class="summary-card-value" style="font-size:18px;letter-spacing:1px">${topGame?.name?.slice(0,18) || '—'}</div>
+        <div class="summary-card-sub">${fmt(topGame?.playing)} players</div>
+      </div>
+      <div class="summary-card" style="--card-accent:#f59e0b;--card-color:#f59e0b">
+        <div class="summary-card-label">Avg Like Ratio</div>
+        <div class="summary-card-value">${avgRatio != null ? avgRatio + '%' : '—'}</div>
+        <div class="summary-card-sub">top 25 games</div>
+      </div>
+      <div class="summary-card" style="--card-accent:#c0192e;--card-color:#ef4444">
+        <div class="summary-card-label">Total Visits</div>
+        <div class="summary-card-value">${fmt(totalVisits)}</div>
+        <div class="summary-card-sub">combined lifetime</div>
+      </div>
+    </div>
+
+    <!-- Player Distribution -->
+    <div class="section-title"><h2>PLAYER DISTRIBUTION</h2></div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title">PLAYERS PER GAME</div>
+        <div class="chart-card-meta">% share of total ${fmt(totalPlaying)} online</div>
+      </div>
+      <div class="chart-card-body">
+        <canvas id="chartBar"></canvas>
+      </div>
+    </div>
+
+    <!-- Distribution list -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title">MARKET SHARE</div>
+        <div class="chart-card-meta">by active players</div>
+      </div>
+      <div class="chart-card-body" style="padding:8px 18px" id="distList"></div>
+    </div>
+
+    <!-- Online history -->
+    <div class="section-title"><h2>ONLINE HISTORY</h2></div>
+    <div class="chart-card">
+      <div class="chart-card-header" style="flex-wrap:wrap;gap:8px">
+        <div class="chart-card-title">UP TO 7 DAYS</div>
+        <div class="history-controls" id="historyControls"></div>
+      </div>
+      <div class="chart-card-body">
+        <canvas id="chartHistory"></canvas>
+      </div>
+    </div>
+
+    <!-- Like ratio leaderboard -->
+    <div class="section-title"><h2>LIKE RATIO LEADERBOARD</h2></div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title">MOST LIKED GAMES</div>
+        <div class="chart-card-meta">upvotes ÷ total votes</div>
+      </div>
+      <div class="chart-card-body" style="padding:8px 18px" id="ratioList"></div>
+    </div>
+
+    <!-- Visits vs Players scatter -->
+    <div class="section-title"><h2>VISITS VS PLAYERS</h2></div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title">RETENTION ANALYSIS</div>
+        <div class="chart-card-meta">total visits vs active now</div>
+      </div>
+      <div class="chart-card-body">
+        <canvas id="chartScatter"></canvas>
+      </div>
+    </div>
+
+    <div style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:32px;letter-spacing:0.5px">
+      Updated ${new Date().toLocaleTimeString()} · Refreshes every 5 min
+    </div>
+  `;
+
+  /* ── Bar chart ── */
+  const top10 = games.slice(0, 10);
+  const barCtx = document.getElementById('chartBar').getContext('2d');
+  charts.bar = new Chart(barCtx, {
+    type: 'bar',
+    data: {
+      labels: top10.map(g => g.name.length > 14 ? g.name.slice(0,12)+'…' : g.name),
+      datasets: [{
+        data: top10.map(g => g.playing ?? 0),
+        backgroundColor: top10.map((_, i) => `rgba(${ar},${ag},${ab},${0.9 - i*0.06})`),
+        borderColor: `rgba(${ar},${ag},${ab},0.8)`,
+        borderWidth: 1, borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#0f0d18', borderColor: '#2d2845', borderWidth: 1,
+        titleColor: '#e8e4f0', bodyColor: '#7a7090',
+        callbacks: { label: ctx => ` ${ctx.parsed.y.toLocaleString()} players (${totalPlaying ? Math.round(ctx.parsed.y/totalPlaying*100) : 0}%)` }
+      }},
+      scales: {
+        x: { grid: { color: '#1e1a2e' }, ticks: { color: '#3d3555', font: { size: 9 } } },
+        y: { grid: { color: '#1e1a2e' }, ticks: { color: '#3d3555', font: { size: 9 }, callback: v => fmt(v) } }
+      }
+    }
+  });
+
+  /* ── Distribution list ── */
+  const distList = document.getElementById('distList');
+  const maxPlaying = Math.max(...games.map(g => g.playing ?? 0), 1);
+  games.slice(0, 15).forEach((g, i) => {
+    const pct = totalPlaying ? ((g.playing ?? 0) / totalPlaying * 100).toFixed(1) : 0;
+    const barW = Math.round(((g.playing ?? 0) / maxPlaying) * 100);
+    const hue = `rgba(${ar},${ag},${ab},${0.9 - i * 0.05})`;
+    const iconEl = g.icon
+      ? `<img class="dist-icon" src="${g.icon}" alt="" onerror="this.style.display='none'">`
+      : `<div class="dist-icon-ph"><svg width="12" height="12" viewBox="0 0 24 24" fill="white" style="opacity:.15"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg></div>`;
+    distList.insertAdjacentHTML('beforeend', `
+      <div class="dist-row">
+        <span class="dist-rank">${i+1}</span>
+        ${iconEl}
+        <div class="dist-info">
+          <div class="dist-name notranslate" translate="no">${g.name}</div>
+          <div class="dist-creator">${g.creator ? 'by '+g.creator : ''}</div>
+        </div>
+        <div class="dist-bar-wrap">
+          <div class="dist-bar-track"><div class="dist-bar-fill" style="width:${barW}%;background:${hue}"></div></div>
+        </div>
+        <span class="dist-val">${fmt(g.playing)}</span>
+        <span class="dist-pct">${pct}%</span>
+      </div>`);
+  });
+
+  /* ── History chart ── */
+  const histControls = document.getElementById('historyControls');
+  let selectedUids = new Set([activeGames[0]?.universeId].filter(Boolean));
+
+  function buildHistoryChart() {
+    if (charts.history) charts.history.destroy();
+    const hCtx = document.getElementById('chartHistory').getContext('2d');
+    const colors = ['#9d5af5','#22c55e','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16','#f97316','#a78bfa','#34d399'];
+    const datasets = activeGames
+      .filter(g => selectedUids.has(g.universeId))
+      .map((g, ci) => {
+        const pts = (history[g.universeId] || []);
+        // If only 1 point, show it; otherwise show line
+        return {
+          label: g.name.length > 18 ? g.name.slice(0,16)+'…' : g.name,
+          data: pts.map(p => ({ x: p.ts, y: p.playing })),
+          borderColor: colors[ci % colors.length],
+          backgroundColor: colors[ci % colors.length] + '22',
+          borderWidth: 2, pointRadius: pts.length <= 2 ? 4 : 0,
+          pointHoverRadius: 4, tension: 0.3, fill: false,
+        };
+      });
+
+    if (datasets.every(d => d.data.length === 0)) {
+      // No history yet — show message
+      document.getElementById('chartHistory').parentElement.innerHTML +=
+        '<p style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;padding:20px 0">History builds over time — come back after a few refreshes to see trends.</p>';
+      return;
+    }
+
+    charts.history = new Chart(hCtx, {
+      type: 'line',
+      data: { datasets },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        parsing: false,
+        plugins: {
+          legend: { labels: { color: '#7a7090', font: { size: 10 }, boxWidth: 12 } },
+          tooltip: {
+            backgroundColor: '#0f0d18', borderColor: '#2d2845', borderWidth: 1,
+            titleColor: '#e8e4f0', bodyColor: '#7a7090',
+            callbacks: {
+              title: items => new Date(items[0].parsed.x).toLocaleString(),
+              label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)} players`,
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            grid: { color: '#1e1a2e' },
+            ticks: {
+              color: '#3d3555', font: { size: 9 }, maxTicksLimit: 7,
+              callback: v => {
+                const d = new Date(v);
+                return d.getHours() === 0
+                  ? d.toLocaleDateString(undefined, { month:'short', day:'numeric' })
+                  : d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+              }
+            }
+          },
+          y: {
+            grid: { color: '#1e1a2e' },
+            ticks: { color: '#3d3555', font: { size: 9 }, callback: v => fmt(v) }
+          }
+        }
+      }
+    });
+  }
+
+  activeGames.forEach((g, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'history-game-btn' + (selectedUids.has(g.universeId) ? ' active' : '');
+    btn.textContent = g.name.length > 16 ? g.name.slice(0,14)+'…' : g.name;
+    btn.setAttribute('translate', 'no');
+    btn.addEventListener('click', () => {
+      if (selectedUids.has(g.universeId)) { if (selectedUids.size > 1) selectedUids.delete(g.universeId); }
+      else { selectedUids.add(g.universeId); }
+      btn.classList.toggle('active', selectedUids.has(g.universeId));
+      buildHistoryChart();
+    });
+    histControls.appendChild(btn);
+  });
+  buildHistoryChart();
+
+  /* ── Like ratio list ── */
+  const ratioList = document.getElementById('ratioList');
+  const byRatio = [...games].filter(g => g.likeRatio != null).sort((a,b) => b.likeRatio - a.likeRatio);
+  byRatio.slice(0, 15).forEach((g, i) => {
+    const col = g.likeRatio >= 90 ? '#22c55e' : g.likeRatio >= 70 ? '#f59e0b' : '#ef4444';
+    ratioList.insertAdjacentHTML('beforeend', `
+      <div class="ratio-row">
+        <div class="ratio-pct" style="color:${col}">${g.likeRatio}%</div>
+        <div class="ratio-fill-wrap">
+          <div class="ratio-name notranslate" translate="no">${g.name}</div>
+          <div class="ratio-votes">${fmt(g.likes)} 👍  ${fmt(g.dislikes)} 👎</div>
+          <div class="ratio-bar-track"><div class="ratio-bar-fill" style="width:${g.likeRatio}%;background:${col}"></div></div>
+        </div>
+      </div>`);
+  });
+
+  /* ── Scatter chart ── */
+  const scatterCtx = document.getElementById('chartScatter').getContext('2d');
+  charts.scatter = new Chart(scatterCtx, {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        label: 'Games',
+        data: games.filter(g => g.visits && g.playing).map(g => ({
+          x: g.visits, y: g.playing,
+          name: g.name,
+        })),
+        backgroundColor: `rgba(${ar},${ag},${ab},0.6)`,
+        borderColor: `rgba(${ar},${ag},${ab},0.9)`,
+        borderWidth: 1, pointRadius: 6, pointHoverRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f0d18', borderColor: '#2d2845', borderWidth: 1,
+          titleColor: '#e8e4f0', bodyColor: '#7a7090',
+          callbacks: {
+            title: items => items[0].raw.name,
+            label: ctx => [`Visits: ${fmt(ctx.raw.x)}`, `Players: ${fmt(ctx.raw.y)}`],
+          }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1e1a2e' }, ticks: { color: '#3d3555', font: { size: 9 }, callback: v => fmt(v) }, title: { display: true, text: 'Total Visits', color: '#3d3555', font: { size: 9 } } },
+        y: { grid: { color: '#1e1a2e' }, ticks: { color: '#3d3555', font: { size: 9 }, callback: v => fmt(v) }, title: { display: true, text: 'Active Players', color: '#3d3555', font: { size: 9 } } }
+      }
+    }
+  });
+}
+
+/* ─── Boot ─── */
+async function boot() {
+  const games = await fetchPopularGames();
+  if (!games) {
+    document.getElementById('statsRoot').innerHTML =
+      `<div class="stats-loading"><p style="color:#b05560">⚠ Could not load data. Check your worker URL and try again.</p></div>`;
+    return;
+  }
+  renderStats(games);
+  setInterval(async () => {
+    const g = await fetchPopularGames();
+    if (g) renderStats(g);
+  }, REFRESH_MS);
+}
+
+boot();
+</script>
+
+<script>
+/* ── Background canvas (same as dashboard) ── */
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, cubes = [], accentRgb = [124, 58, 237];
+
+  function readAccent() {
+    const hex = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(hex))
+      accentRgb = [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
+  }
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  function makeCube() {
+    return { x: Math.random()*W, y: Math.random()*H, z: 0.4+Math.random()*0.8,
+      s: 18+Math.random()*42, vx: (Math.random()-0.5)*0.35, vy: -0.15-Math.random()*0.25,
+      rx: Math.random()*Math.PI*2, ry: Math.random()*Math.PI*2, rz: Math.random()*Math.PI*2,
+      drx: (Math.random()-0.5)*0.008, dry: (Math.random()-0.5)*0.010, drz: (Math.random()-0.5)*0.006,
+      alpha: 0.04+Math.random()*0.10 };
+  }
+  function initCubes() { cubes = Array.from({length: Math.min(22, Math.floor(W*H/48000))}, makeCube); }
+  function project(x,y,z,cx,cy) { const d=320/(320+z*200); return [cx+x*d, cy+y*d]; }
+  function rotate(px,py,pz,rx,ry,rz) {
+    let y1=py*Math.cos(rx)-pz*Math.sin(rx), z1=py*Math.sin(rx)+pz*Math.cos(rx);
+    let x2=px*Math.cos(ry)+z1*Math.sin(ry), z2=-px*Math.sin(ry)+z1*Math.cos(ry);
+    return [x2*Math.cos(rz)-y1*Math.sin(rz), x2*Math.sin(rz)+y1*Math.cos(rz), z2];
+  }
+  const VERTS=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+  const EDGES=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+  function drawCube(c) {
+    const [r,g,b]=accentRgb;
+    const pts=VERTS.map(([vx,vy,vz])=>{ const [rx,ry,rz2]=rotate(vx*c.s,vy*c.s,vz*c.s,c.rx,c.ry,c.rz); return project(rx,ry,rz2,c.x,c.y); });
+    ctx.save(); ctx.strokeStyle=`rgba(${r},${g},${b},${c.alpha})`; ctx.lineWidth=1; ctx.beginPath();
+    EDGES.forEach(([a,b])=>{ ctx.moveTo(pts[a][0],pts[a][1]); ctx.lineTo(pts[b][0],pts[b][1]); });
+    ctx.stroke(); ctx.restore();
+  }
+  function tick() {
+    ctx.clearRect(0,0,W,H); readAccent();
+    cubes.forEach(c => {
+      c.x+=c.vx; c.y+=c.vy; c.rx+=c.drx; c.ry+=c.dry; c.rz+=c.drz;
+      if(c.x<-c.s*2) c.x=W+c.s; if(c.x>W+c.s*2) c.x=-c.s;
+      if(c.y<-c.s*2) { Object.assign(c,makeCube()); c.y=H+c.s*2; }
+      drawCube(c);
+    });
+    requestAnimationFrame(tick);
+  }
+  resize(); initCubes(); tick();
+  window.addEventListener('resize', ()=>{ resize(); initCubes(); });
+  new MutationObserver(()=>readAccent()).observe(document.documentElement, {attributes:true, attributeFilter:['style']});
+})();
+</script>
+
+</body>
+</html>
