@@ -6,9 +6,34 @@
   <meta name="google" content="notranslate">
   <title>Ghost's Dashboard</title>
   <link rel="stylesheet" href="dashboard.css">
-  <link rel="icon" href="website_icon.webp" type="image/png">
 </head>
 <body>
+
+<nav class="topbar">
+  <a class="topbar-logo" href="dashboard.html">
+    <div class="topbar-sigil">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2L4 6.5V12C4 16.1 7.4 19.9 12 21C16.6 19.9 20 16.1 20 12V6.5L12 2Z" stroke="#9d5af5" stroke-width="1.5" fill="rgba(124,58,237,0.1)"/>
+        <path d="M9 12L11 14L15 10" stroke="#9d5af5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="topbar-wordmark">GHOST'S <em>HUB</em></span>
+  </a>
+  <div class="topbar-nav">
+    <a class="topbar-link active" href="dashboard.html">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <span>Dashboard</span>
+    </a>
+    <a class="topbar-link" href="stats.html">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>General Statistics</span>
+    </a>
+  </div>
+  <div class="topbar-live">
+    <span class="dot-blink"></span>
+    Live
+  </div>
+</nav>
 
 <canvas id="bgCanvas"></canvas>
 <div class="container">
@@ -154,12 +179,12 @@
 // ── YOUR CLOUDFLARE WORKER URL ───────────────────────────
 // Deploy worker.js to https://workers.cloudflare.com (free)
 // then replace the placeholder below with your worker URL.
-const WORKER_URL = 'https://gentle-pond-6ad4.senka090710.workers.dev/';
+const WORKER_URL = 'https://YOUR-WORKER-NAME.YOUR-SUBDOMAIN.workers.dev';
 // ─────────────────────────────────────────────────────────
 const REFRESH       = 30_000;
 const POPULAR_REFRESH = 5 * 60_000; // refresh live stats every 5 min
 const LS_KEY        = 'ghost_dashboard_settings';
-const PRESET_COLORS = ['#630e20','#c0192e','#1a6b2a','#0e4fa8','#7c3aed','#b45309','#0e7490','#be185d'];
+const PRESET_COLORS = ['#7c3aed','#9d5af5','#c0192e','#0e4fa8','#b45309','#0e7490','#22c55e','#be185d'];
 
 // ─── Edit these fallback IDs if ids.json can't be loaded ───
 const FALLBACK_IDS = [
@@ -169,7 +194,7 @@ const FALLBACK_IDS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  accentBase:  '#630e20',
+  accentBase:  '#7c3aed',
   pinnedGames: FALLBACK_IDS.map(g => g.placeId),
 };
 
@@ -196,7 +221,7 @@ function applyAccent(hex) {
   root.style.setProperty('--accent',        hex);
   root.style.setProperty('--accent-light',  light);
   root.style.setProperty('--accent-bright', bright);
-  root.style.setProperty('--accent-dim',    `rgba(${r},${g},${b},0.2)`);
+  root.style.setProperty('--accent-dim',    `rgba(${r},${g},${b},0.18)`);
   root.style.setProperty('--accent-glow',   `rgba(${rl},${gl},${bl},0.4)`);
   root.style.setProperty('--pattern-accent',`rgba(${r},${g},${b},0.18)`);
   root.style.setProperty('--pattern-hatch', `rgba(${r},${g},${b},0.055)`);
@@ -677,7 +702,7 @@ init();
 (function() {
   const canvas = document.getElementById('bgCanvas');
   const ctx    = canvas.getContext('2d');
-  let W, H, cubes = [], accentRgb = [99, 14, 32];
+  let W, H, cubes = [], accentRgb = [124, 58, 237];
 
   /* Read current accent colour from CSS vars */
   function readAccent() {
